@@ -1,0 +1,67 @@
+@app.websocket(
+    "/ws/chat/{user_id}",
+    name="chat",
+)
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+):
+    bot_id = str(manager.id_count)
+    await manager.connect(websocket, bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id=user_id,
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.chat_handler.web_socket_chat(
+                chat_id=chat.id,
+                user_id=user_id,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(bot_id)
+
+
+@app.websocket(
+    "/cs/chat",
+    name="CS chat",
+)
+async def cs_chat(
+    websocket: WebSocket,
+):
+    bot_id = str(manager.id_count)
+    await manager.connect(websocket, bot_id=bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id="1",
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.cs_handler.cs_chat(
+                chat_id=chat.id,
+                user_id=None,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(bot_id)

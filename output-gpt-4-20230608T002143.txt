@@ -1,0 +1,148 @@
+model: gpt-4
+time: 0:00:58.970475
+question: ```
+import asyncio
+import os
+from typing import Any, Dict, List, Optional, Union
+
+from langchain import LLMChain, PromptTemplate
+from langchain.callbacks.base import AsyncCallbackHandler, BaseCallbackHandler, BaseCallbackManager
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferWindowMemory
+from langchain.schema import AgentAction, AgentFinish, LLMResult
+
+template = """Assistant is a large language model trained by OpenAI.
+
+Assistant is designed to be able to assist with a wide range of tasks, from answering simple questions to providing in-depth explanations and discussions on a wide range of topics. As a language model, Assistant is able to generate human-like text based on the input it receives, allowing it to engage in natural-sounding conversations and provide responses that are coherent and relevant to the topic at hand.
+
+Assistant is constantly learning and improving, and its capabilities are constantly evolving. It is able to process and understand large amounts of text, and can use this knowledge to provide accurate and informative responses to a wide range of questions. Additionally, Assistant is able to generate its own text based on the input it receives, allowing it to engage in discussions and provide explanations and descriptions on a wide range of topics.
+
+Overall, Assistant is a powerful tool that can help with a wide range of tasks and provide valuable insights and information on a wide range of topics. Whether you need help with a specific question or just want to have a conversation about a particular topic, Assistant is here to assist.
+
+{history}
+Human: {human_input}
+Assistant:"""
+
+
+class GenerateResponseType:
+    human_input: str
+    history: str
+    text: str
+
+    def __init__(self, human_input: str, history: str, text: str) -> None:
+        self.human_input = human_input
+        self.history = history
+        self.text = text
+
+
+# class MyCustomSyncHandler(BaseCallbackHandler):
+#     def on_llm_new_token(self, token: str, **kwargs) -> None:
+#         print(f"Sync handler being called in a `thread_pool_executor`: token: {token}")
+
+
+class MyCustomCallbackHandler(AsyncCallbackHandler):
+    def __init__(self, ws=None) -> None:
+        super().__init__()
+        self.ws = ws
+
+    async def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
+        """Run when chain starts running."""
+        print("zzzz....")
+        await asyncio.sleep(0.3)
+        print("Hi! I just woke up. Your llm is starting")
+
+    async def on_llm_new_token(self, token: str, **kwargs) -> None:
+        print(f"Sync handler being called in a `thread_pool_executor`: token: {token}")
+
+    async def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Run when chain ends running."""
+        print("zzzz....")
+        await asyncio.sleep(0.3)
+        print("Hi! I just woke up. Your llm is ending")
+
+
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str, callbacks: Optional[List[BaseCallbackHandler]] = None):
+        self.model_name = model_name
+        self.max_tokens = self._get_max_tokens(model_name)
+        self.api_key = api_key
+        self.prompt = prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
+        self.callback_manager = BaseCallbackManager(callbacks if callbacks else [])
+
+        self.llm = LLMChain(
+            llm=ChatOpenAI(model=model_name, openai_api_key=api_key, client=None, streaming=True, callback_manager=self.callback_manager),
+            prompt=prompt,
+            verbose=True,
+            memory=ConversationBufferWindowMemory(k=2),
+        )
+
+    def _get_max_tokens(self, model_name: str) -> Optional[int]:
+        model_token_limits = {
+            "gpt-3.5-turbo": 4096,
+            # Add more model token limits here if needed
+        }
+        return model_token_limits.get(model_name)
+
+    async def generate_response(self, question: str, max_tokens: Optional[int] = None, temperature: float = 0.7, n: int = 1) -> str:
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        response = self.llm(question)
+        res = GenerateResponseType(**response)
+
+        return res.text
+
+    def add_callback(self, callback: AsyncCallbackHandler) -> None:
+        self.callback_manager.add_handler(callback)
+
+
+async def main():
+    client = LangChainClient(model_name="gpt-3.5-turbo", api_key=os.environ["OPENAI_API_KEY"])
+    client.add_callback(MyCustomCallbackHandler())
+    response = await client.generate_response("What is the meaning of life?")
+    print(response)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+```
+
+```
+/home/ekusiadadus/dev/minyoo/minyoo/.venv/lib/python3.11/site-packages/langchain/callbacks/manager.py:139: RuntimeWarning: coroutine 'AsyncCallbackHandler.on_chat_model_start' was never awaited
+  getattr(handler, event_name)(*args, **kwargs)
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+/home/ekusiadadus/dev/minyoo/minyoo/.venv/lib/python3.11/site-packages/langchain/callbacks/manager.py:139: RuntimeWarning: coroutine 'MyCustomCallbackHandler.on_llm_new_token' was never awaited
+  getattr(handler, event_name)(*args, **kwargs)
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+/home/ekusiadadus/dev/minyoo/minyoo/.venv/lib/python3.11/site-packages/langchain/callbacks/manager.py:139: RuntimeWarning: coroutine 'MyCustomCallbackHandler.on_llm_end' was never awaited
+  getattr(handler, event_name)(*args, **kwargs)
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+```
+
+
+await できていないとエラーが出ます。
+どのように修正すればいいですか？
+answer: コールバックhandlerのイベントを適切にawaitするためには、`BaseCallbackManager`の`fire_event`メソッド内で `asyncio.create_task()`を使用し、イベントを適切にawaitする必要があります。以下のように修正してみてください：
+```python
+import asyncio
+
+from langchain.callbacks.base import AsyncCallbackManager
+
+class MyAsyncCallbackManager(AsyncCallbackManager):
+    async def fire_event(self, event_name: str, *args, **kwargs) -> None:
+        for handler in self.handlers:
+            if hasattr(handler, event_name):
+                asyncio.create_task(getattr(handler, event_name)(*args, **kwargs))
+```
+
+次に、ちょうど`LangChainClient`がインスタンス化される直後に、新しく作成した`MyAsyncCallbackManager`を使用してください。
+
+```python
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str, callbacks: Optional[List[BaseCallbackHandler]] = None):
+        ...
+        self.callback_manager = MyAsyncCallbackManager(callbacks if callbacks else [])
+       ...
+```
+この変更により、各コールバックハンドラー内のasyncイベントが正しくawaitされるはずです。

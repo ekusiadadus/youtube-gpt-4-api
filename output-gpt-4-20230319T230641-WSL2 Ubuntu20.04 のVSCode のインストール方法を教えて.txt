@@ -1,0 +1,42 @@
+model: gpt-4
+time: 0:00:44.917006
+question: WSL2 Ubuntu20.04 のVSCode のインストール方法を教えて
+answer: WSL2（Windows Subsystem for Linux 2）のUbuntu 20.04に、Visual Studio Code（VSCode）をインストールする手順は以下のとおりです。
+
+1. まず、Windows 10上でWSL2とUbuntu 20.04をセットアップしてください。セットアップ手順は[こちら](https://docs.microsoft.com/ja-jp/windows/wsl/install-win10)を参考にしてください。
+
+2. WSL2のUbuntu 20.04環境にログインします。WindowsのPowerShellやコマンドプロンプト上で`wsl`コマンドを実行してください。
+
+```
+wsl
+```
+
+3. WSL2のUbuntu 20.04環境で、次のコマンドを実行して、必要な依存関係をインストールします。
+
+```
+sudo apt update
+sudo apt install software-properties-common apt-transport-https curl
+```
+
+4. MicrosoftのGPGキーをインポートし、VSCodeのリポジトリを追加してください。
+
+```
+curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-archive-keyring.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/vscode stable main" | sudo tee /etc/apt/sources.list.d/vscode.list
+```
+
+5. VSCodeをインストールします。
+
+```
+sudo apt update
+sudo apt install code
+```
+
+6. Windows側で、「Remote - WSL」拡張機能をインストールしてください。これにより、Windows上のVSCodeでWSL2のUbuntu環境と連携できます。
+
+- VSCodeを起動し、左側のメニューバーから「拡張機能」をクリックします。
+- 検索ボックスに「Remote - WSL」と入力し、検索結果に表示された拡張機能をインストールします。
+
+7. インストールが完了したら、Windows上のVSCodeで「Remote-WSL: New Window」を実行すると、VSCodeがWSL2のUbuntu環境で開きます。
+
+これで、WSL2のUbuntu 20.04上でVSCodeが使えるようになります。

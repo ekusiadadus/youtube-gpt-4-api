@@ -1,0 +1,485 @@
+model: gpt-4
+time: 0:04:48.472750
+question: 
+```rust
+use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Env {
+    local: String,
+    dev: String,
+    prod: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiInfo {
+    path: String,
+    desc: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiVer {
+    env: Env,
+    api: HashMap<String, ApiInfo>,
+}
+
+type ApiResponse = HashMap<String, ApiVer>;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiServer {
+    url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiOperation {
+    summary: String,
+    operation_id: String,
+    tags: Vec<String>,
+    security: Vec<OpenApiRequirements>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiRequirements {
+    #[serde(flatten)]
+    requirements: HashMap<String, Vec<String>>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiPath {
+    #[serde(flatten)]
+    operations: HashMap<String, OpenApiOperation>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiPaths {
+    #[serde(flatten)]
+    paths: HashMap<String, OpenApiPath>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiInfo {
+    title: String,
+    version: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiComponents {
+    security_schemes: HashMap<String, OpenApiSecurityScheme>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiSecurityScheme {
+    #[serde(rename = "type")]
+    type_: String,
+    scheme: String,
+    bearer_format: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiData {
+    openapi: String,
+    info: OpenApiInfo,
+    servers: Vec<OpenApiServer>,
+    paths: OpenApiPaths,
+    components: OpenApiComponents,
+}
+fn json_to_openapi(json_str: &str) -> Result<OpenApiData, serde_json::Error> {
+    let response: ApiResponse = serde_json::from_str(json_str)?;
+
+    let mut servers = Vec::new();
+    let binding = "".to_string();
+    let dev_url = response
+        .iter()
+        .next()
+        .map(|(_, api)| &api.env.dev)
+        .unwrap_or(&binding);
+    let binding = "".to_string();
+    let prod_url = response
+        .iter()
+        .next()
+        .map(|(_, api)| &api.env.prod)
+        .unwrap_or(&binding);
+    servers.push(OpenApiServer {
+        url: dev_url.to_string(),
+    });
+    servers.push(OpenApiServer {
+        url: prod_url.to_string(),
+    });
+
+    let mut openapi_paths: HashMap<String, OpenApiPath> = HashMap::new();
+    for (api_version, api_ver_info) in response {
+        for (api_name, api_info) in &api_ver_info.api {
+            let operation = OpenApiOperation {
+                summary: api_info.desc.to_string(),
+                operation_id: format!("{}_{}", api_version, api_name),
+                tags: vec![api_version.to_string()],
+                security: vec![OpenApiRequirements {
+                    requirements: vec![("BearerAuth".to_owned(), vec![])]
+                        .into_iter()
+                        .collect(),
+                }],
+            };
+            let method = "get".to_string(); // ここでは、すべてのAPI呼び出しに 'get' メソッドを使用します。
+            let path_operations = vec![(method, operation)].into_iter().collect();
+            let api_path = OpenApiPath {
+                operations: path_operations,
+            };
+            openapi_paths.insert(api_info.path.to_string(), api_path);
+        }
+    }
+
+    let info = OpenApiInfo {
+        // title today as yyyy.mm.dd + "-m2m-cleaning"
+        title: format!("{}-m2m-cleaning", chrono::Local::now().format("%Y.%m.%d")),
+        // version set today as yyyy.mm.dd
+        version: chrono::Local::now().format("%Y.%m.%d").to_string(),
+    };
+
+    let security_schemes: HashMap<String, OpenApiSecurityScheme> = vec![(
+        "BearerAuth".to_owned(),
+        OpenApiSecurityScheme {
+            type_: "http".to_owned(),
+            scheme: "bearer".to_owned(),
+            bearer_format: "{{JWT}}".to_owned(),
+        },
+    )]
+    .into_iter()
+    .collect();
+
+    let components = OpenApiComponents { security_schemes };
+
+    let openapi_data = OpenApiData {
+        openapi: "3.0.0".to_string(),
+        info,
+        servers,
+        paths: OpenApiPaths {
+            paths: openapi_paths,
+        },
+        components,
+    };
+
+    Ok(openapi_data)
+}
+
+fn main() {
+    let json_str = r#"
+    {
+  "manager-v1": {
+    "env": {
+      "local": "http://localhost:7999",
+      "dev": "https://api-cleaning.dev.m2msystems.cloud",
+      "prod": "https://api-cleaning.m2msystems.cloud"
+    },
+    "api": {
+      "healthCheck": {
+        "path": "/health_check",
+        "desc": "ヘルスチェックを行う"
+      },
+      "listCheckitems": {
+        "path": "/checkitems",
+        "desc": "チェック項目の一覧を取得する"
+      },
+      "setCheckitems": {
+        "path": "/checkitems",
+        "desc": "チェック項目の一覧を保存する"
+      }
+    }
+  },
+  "manager-v2": {
+    "env": {
+      "local": "http://localhost:7999",
+      "dev": "https://api-cleaning.dev.m2msystems.cloud",
+      "prod": "https://api-cleaning.m2msystems.cloud"
+    },
+    "api": {
+      "listCleanings": {
+        "path": "/v2/cleanings",
+        "desc": "@deprecated 自社の清掃の一覧を取得する"
+      },
+      "listDelegateCleanings": {
+        "path": "/v2/delegate_cleanings",
+        "desc": "@deprecated 委譲先の清掃の一覧を取得する"
+      },
+      "searchCleanings": {
+        "path": "/v2/search/cleanings",
+        "desc": "@deprecated 清掃管理者が物件名,日付で清掃を検索する"
+      }
+    }
+  },
+  "cleaner-v1": {
+    "env": {
+      "local": "http://localhost:7999",
+      "dev": "https://api-cleaning.dev.m2msystems.cloud",
+      "prod": "https://api-cleaning.m2msystems.cloud"
+    },
+    "api": {
+      "startCleaning": {
+        "path": "/cleanings/:cleaningId/start",
+        "desc": "清掃員が清掃を開始する"
+      }
+    }
+  }
+}
+    "#;
+    let openapi_data = match json_to_openapi(json_str) {
+        Ok(data) => data,
+        Err(e) => panic!("Error converting JSON to OpenAPI: {:?}", e),
+    };
+
+    let openapi_yaml_str = serde_yaml::to_string(&openapi_data).unwrap();
+    fs::write("openapi.yaml", openapi_yaml_str).expect("Unable to write YAML file");
+
+    let openapi_json_str = serde_json::to_string_pretty(&openapi_data).unwrap();
+    fs::write("openapi.json", openapi_json_str).expect("Unable to write JSON file");
+}
+```
+
+上のコードでは、OpenAPI形式のJSON、YMLを生成します。
+Postmanで常にAuthorizationヘッダーに、Bearerトークンを{{JWT}}として設定するJSON,YMLを生成するようなコードにしたいです。
+現状は、空になっています。
+修正してください。
+
+answer: 各API呼び出しのセキュリティ要件にBearerトークンを必須にするには、OpenApiOperationのsecurityプロパティにOpenApiRequirementsを追加すればよいです。
+
+下に修正済みのコードを示します。
+
+```rust
+use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Env {
+    local: String,
+    dev: String,
+    prod: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiInfo {
+    path: String,
+    desc: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiVer {
+    env: Env,
+    api: HashMap<String, ApiInfo>,
+}
+
+type ApiResponse = HashMap<String, ApiVer>;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiServer {
+    url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiOperation {
+    summary: String,
+    operation_id: String,
+    tags: Vec<String>,
+    security: Vec<OpenApiRequirements>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiRequirements {
+    #[serde(flatten)]
+    requirements: HashMap<String, Vec<String>>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiPath {
+    #[serde(flatten)]
+    operations: HashMap<String, OpenApiOperation>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiPaths {
+    #[serde(flatten)]
+    paths: HashMap<String, OpenApiPath>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiInfo {
+    title: String,
+    version: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiComponents {
+    security_schemes: HashMap<String, OpenApiSecurityScheme>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiSecurityScheme {
+    #[serde(rename = "type")]
+    type_: String,
+    scheme: String,
+    bearer_format: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiData {
+    openapi: String,
+    info: OpenApiInfo,
+    servers: Vec<OpenApiServer>,
+    paths: OpenApiPaths,
+    components: OpenApiComponents,
+}
+fn json_to_openapi(json_str: &str) -> Result<OpenApiData, serde_json::Error> {
+    let response: ApiResponse = serde_json::from_str(json_str)?;
+
+    let mut servers = Vec::new();
+    let binding = "".to_string();
+    let dev_url = response
+        .iter()
+        .next()
+        .map(|(_, api)| &api.env.dev)
+        .unwrap_or(&binding);
+    let binding = "".to_string();
+    let prod_url = response
+        .iter()
+        .next()
+        .map(|(_, api)| &api.env.prod)
+        .unwrap_or(&binding);
+    servers.push(OpenApiServer {
+        url: dev_url.to_string(),
+    });
+    servers.push(OpenApiServer {
+        url: prod_url.to_string(),
+    });
+
+    let mut openapi_paths: HashMap<String, OpenApiPath> = HashMap::new();
+    for (api_version, api_ver_info) in response {
+        for (api_name, api_info) in &api_ver_info.api {
+            let operation = OpenApiOperation {
+                summary: api_info.desc.to_string(),
+                operation_id: format!("{}_{}", api_version, api_name),
+                tags: vec![api_version.to_string()],
+                security: vec![OpenApiRequirements {
+                    requirements: vec![("BearerAuth".to_owned(), vec!["Bearer {{JWT}}".to_owned()])]
+                        .into_iter()
+                        .collect(),
+                }],
+            };
+            let method = "get".to_string(); // ここでは、すべてのAPI呼び出しに 'get' メソッドを使用します。
+            let path_operations = vec![(method, operation)].into_iter().collect();
+            let api_path = OpenApiPath {
+                operations: path_operations,
+            };
+            openapi_paths.insert(api_info.path.to_string(), api_path);
+        }
+    }
+
+    let info = OpenApiInfo {
+        // title today as yyyy.mm.dd + "-m2m-cleaning"
+        title: format!("{}-m2m-cleaning", chrono::Local::now().format("%Y.%m.%d")),
+        // version set today as yyyy.mm.dd
+        version: chrono::Local::now().format("%Y.%m.%d").to_string(),
+    };
+
+    let security_schemes: HashMap<String, OpenApiSecurityScheme> = vec![(
+        "BearerAuth".to_owned(),
+        OpenApiSecurityScheme {
+            type_: "http".to_owned(),
+            scheme: "bearer".to_owned(),
+            bearer_format: "Bearer {{JWT}}".to_owned(),
+        },
+    )]
+    .into_iter()
+    .collect();
+
+    let components = OpenApiComponents { security_schemes };
+
+    let openapi_data = OpenApiData {
+        openapi: "3.0.0".to_string(),
+        info,
+        servers,
+        paths: OpenApiPaths {
+            paths: openapi_paths,
+        },
+        components,
+    };
+
+    Ok(openapi_data)
+}
+
+fn main() {
+    let json_str = r#"
+    {
+  "manager-v1": {
+    "env": {
+      "local": "http://localhost:7999",
+      "dev": "https://api-cleaning.dev.m2msystems.cloud",
+      "prod": "https://api-cleaning.m2msystems.cloud"
+    },
+    "api": {
+      "healthCheck": {
+        "path": "/health_check",
+        "desc": "ヘルスチェックを行う"
+      },
+      "listCheckitems": {
+        "path": "/checkitems",
+        "desc": "チェック項目の一覧を取得する"
+      },
+      "setCheckitems": {
+        "path": "/checkitems",
+        "desc": "チェック項目の一覧を保存する"
+      }
+    }
+  },
+  "manager-v2": {
+    "env": {
+      "local": "http://localhost:7999",
+      "dev": "https://api-cleaning.dev.m2msystems.cloud",
+      "prod": "https://api-cleaning.m2msystems.cloud"
+    },
+    "api": {
+      "listCleanings": {
+        "path": "/v2/cleanings",
+        "desc": "@deprecated 自社の清掃の一覧を取得する"
+      },
+      "listDelegateCleanings": {
+        "path": "/v2/delegate_cleanings",
+        "desc": "@deprecated 委譲先の清掃の一覧を取得する"
+      },
+      "searchCleanings": {
+        "path": "/v2/search/cleanings",
+        "desc": "@deprecated 清掃管理者が物件名,日付で清掃を検索する"
+      }
+    }
+  },
+  "cleaner-v1": {
+    "env": {
+      "local": "http://localhost:7999",
+      "dev": "https://api-cleaning.dev.m2msystems.cloud",
+      "prod": "https://api-cleaning.m2msystems.cloud"
+    },
+    "api": {
+      "startCleaning": {
+        "path": "/cleanings/:cleaningId/start",
+        "desc": "清掃員が清掃を開始する"
+      }
+    }
+  }
+}
+    "#;
+    let openapi_data = match json_to_openapi(json_str) {
+        Ok(data) => data,
+        Err(e) => panic!("Error converting JSON to OpenAPI: {:?}", e),
+    };
+
+    let openapi_yaml_str = serde_yaml::to_string(&openapi_data).unwrap();
+    fs::write("openapi.yaml", openapi_yaml_str).expect("Unable to write YAML file");
+
+    let openapi_json_str = serde_json::to_string_pretty(&openapi_data).unwrap();
+    fs::write("openapi.json", openapi_json_str).expect("Unable to write JSON file");
+}
+```
+
+この修正により、OpenAPIの各API呼び出しのセキュリティ要件に、次のようにAuthorizationヘッダーにBearerトークンを含めることが必須になります。
+
+```
+Bearer {{JWT}}
+```

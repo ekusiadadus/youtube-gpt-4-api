@@ -1,0 +1,337 @@
+model: gpt-4
+time: 0:01:49.189803
+question: ```typescript
+import { type BoardType } from "../model/boardType"
+import { PieceDisplay, type PieceState, PieceType } from "../model/pieceType"
+
+const initialBoard: BoardType = {
+  board: [
+    [
+      { type: PieceType.Kyo, direction: "down" },
+      { type: PieceType.Kei, direction: "down" },
+      { type: PieceType.Gin, direction: "down" },
+      { type: PieceType.Kin, direction: "down" },
+      { type: PieceType.Ou, direction: "down" },
+      { type: PieceType.Kin, direction: "down" },
+      { type: PieceType.Gin, direction: "down" },
+      { type: PieceType.Kei, direction: "down" },
+      { type: PieceType.Kyo, direction: "down" }
+    ],
+    [
+      null,
+      { type: PieceType.Hisha, direction: "down" },
+      null,
+      null,
+      null,
+      null,
+      null,
+      { type: PieceType.Kaku, direction: "down" },
+      null
+    ],
+    [
+      { type: PieceType.Fu, direction: "down" },
+      { type: PieceType.Fu, direction: "down" },
+      { type: PieceType.Fu, direction: "down" },
+      { type: PieceType.Fu, direction: "down" },
+      { type: PieceType.Fu, direction: "down" },
+      { type: PieceType.Fu, direction: "down" },
+      { type: PieceType.Fu, direction: "down" },
+      { type: PieceType.Fu, direction: "down" },
+      { type: PieceType.Fu, direction: "down" }
+    ],
+    Array(9).fill(null),
+    Array(9).fill(null),
+    Array(9).fill(null),
+    [
+      { type: PieceType.Fu, direction: "up" },
+      { type: PieceType.Fu, direction: "up" },
+      { type: PieceType.Fu, direction: "up" },
+      { type: PieceType.Fu, direction: "up" },
+      { type: PieceType.Fu, direction: "up" },
+      { type: PieceType.Fu, direction: "up" },
+      { type: PieceType.Fu, direction: "up" },
+      { type: PieceType.Fu, direction: "up" },
+      { type: PieceType.Fu, direction: "up" }
+    ],
+    [
+      null,
+      { type: PieceType.Kaku, direction: "up" },
+      null,
+      null,
+      null,
+      null,
+      null,
+      { type: PieceType.Hisha, direction: "up" },
+      null
+    ],
+    [
+      { type: PieceType.Kyo, direction: "up" },
+      { type: PieceType.Kei, direction: "up" },
+      { type: PieceType.Gin, direction: "up" },
+      { type: PieceType.Kin, direction: "up" },
+      { type: PieceType.Gyoku, direction: "up" },
+      { type: PieceType.Kin, direction: "up" },
+      { type: PieceType.Gin, direction: "up" },
+      { type: PieceType.Kei, direction: "up" },
+      { type: PieceType.Kyo, direction: "up" }
+    ]
+  ],
+  upKomadai: {
+    [PieceType.Fu]: 0,
+    [PieceType.Kyo]: 0,
+    [PieceType.Kei]: 0,
+    [PieceType.Gin]: 0,
+    [PieceType.Kin]: 0,
+    [PieceType.Kaku]: 0,
+    [PieceType.Hisha]: 0,
+    [PieceType.Gyoku]: 0,
+    [PieceType.Ou]: 0,
+    [PieceType.To]: 0,
+    [PieceType.Narikyo]: 0,
+    [PieceType.Narikei]: 0,
+    [PieceType.Narigin]: 0,
+    [PieceType.Uma]: 0,
+    [PieceType.Ryu]: 0
+  },
+  downKomadai: {
+    [PieceType.Fu]: 0,
+    [PieceType.Kyo]: 0,
+    [PieceType.Kei]: 0,
+    [PieceType.Gin]: 0,
+    [PieceType.Kin]: 0,
+    [PieceType.Kaku]: 0,
+    [PieceType.Hisha]: 0,
+    [PieceType.Gyoku]: 0,
+    [PieceType.Ou]: 0,
+    [PieceType.To]: 0,
+    [PieceType.Narikyo]: 0,
+    [PieceType.Narikei]: 0,
+    [PieceType.Narigin]: 0,
+    [PieceType.Uma]: 0,
+    [PieceType.Ryu]: 0
+  },
+  turn: "up",
+  selected: null,
+  winner: null
+}
+
+export const num2num = (str: string) => {
+  // 全角数字を半角数字に
+  let reg
+  const twoBtNum = ["１", "２", "３", "４", "５", "６", "７", "８", "９", "０"]
+  const num = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+  for (let i = 0; i < num.length; i++) {
+    reg = new RegExp(twoBtNum[i], "g") // ex) reg = /３/g
+    str = str.replace(reg, num[i])
+  }
+  return str
+}
+export const kanji2num = (str: string) => {
+  // 漢数字を半角数字に
+  let reg
+  const kanjiNum = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "〇"]
+  const num = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+  for (let i = 0; i < num.length; i++) {
+    reg = new RegExp(kanjiNum[i], "g") // ex) reg = /三/g
+    str = str.replace(reg, num[i])
+  }
+  return str
+}
+
+// KIF形式から盤面の座標を得るための関数
+export const parseKIFLine = (kifLine: string) => {
+  kifLine = num2num(kifLine)
+  kifLine = kanji2num(kifLine)
+
+  const matches = kifLine.match(/(\d+) (\d{2})(\D+)\((\d{2})\)/)
+
+  if (matches === null) {
+    throw new Error("Invalid KIF format")
+  }
+
+  // eslint-disable-next-line
+  const matchesNotNull = matches!
+
+  // 元の位置
+  const fromY = parseInt(matches[4].charAt(1), 10) - 1
+  const fromX = 9 - parseInt(matches[4].charAt(0), 10)
+
+  // 移動先の位置
+  const toY = parseInt(matches[2].charAt(1), 10) - 1
+  const toX = 9 - parseInt(matches[2].charAt(0), 10)
+
+  // 駒の種類を取得
+  const pieceType = Object.keys(PieceDisplay).find(
+    key => PieceDisplay[key as keyof typeof PieceDisplay] === matchesNotNull[3]
+  )
+
+  if (!pieceType) {
+    throw new Error("Invalid piece type")
+  }
+
+  const index = parseInt(matches[1], 10) // 手番をインデックスとして使用します
+  const direction: "up" | "down" = index % 2 === 1 ? "up" : "down" // 修正: 1始まりのインデックスを考慮
+
+  return { fromX, fromY, toX, toY, pieceType, direction }
+}
+
+// KIF形式から盤面の座標を得るための関数
+// ボードと駒台を更新する関数
+export const updateBoardAndKomadai = ({
+  board,
+  move
+}: {
+  board: BoardType
+  move: {
+    fromX: number | null
+    fromY: number | null
+    toX: number
+    toY: number
+    pieceType: PieceType
+    upKomadai: Record<PieceType, number>
+    downKomadai: Record<PieceType, number>
+    direction: "up" | "down"
+  }
+}): BoardType => {
+
+  newBoard[move.toY][move.toX] = piece
+
+  return {
+    board: newBoard,
+    upKomadai: newUpKomadai,
+    downKomadai: newDownKomadai,
+    turn: move.direction === "up" ? "down" : "up", // Switch turn
+    selected: null,
+    winner: null
+  }
+}
+
+export const parseKIF = (KIF: string) => {
+  const boardHistory: BoardType[] = [initialBoard]
+  const lines = KIF.split(/\r?\n/)
+
+  lines.forEach((line, index) => {
+    boardHistory.push(
+      updateBoardAndKomadai({
+        board: boardHistory[boardHistory.length - 1],
+        move:
+      })
+    )
+  })
+
+  return boardHistory
+}
+```
+
+```
+import Game from "../components/Game/Game"
+
+export const GamePage = () => {
+  return (
+    <Game
+      KIF={`1 ２六歩(27) (00:00/00:00:00)
+2 ８四歩(83) (00:00/00:00:00)
+3 ２五歩(26) (00:00/00:00:00)
+4 ８五歩(84) (00:00/00:00:00)
+5 ７八金(69) (00:00/00:00:00)
+6 ３二金(41) (00:00/00:00:00)
+7 ３八銀(39) (00:00/00:00:00)
+8 ７二銀(71) (00:00/00:00:00)
+9 ９六歩(97) (00:00/00:00:00)
+10 １四歩(13) (00:00/00:00:00)
+11 １六歩(17) (00:00/00:00:00)
+12 ９四歩(93) (00:00/00:00:00)
+13 ６八玉(59) (00:00/00:00:00)
+14 ８六歩(85) (00:00/00:00:00)`}
+    />
+  )
+}
+
+```
+
+1. parseKIFLINE を廃止して、parsekif内でKIF形式のparserを完成させたいです。
+2. また上のようなKIFの処理で、同+駒 や、駒を駒台から打つ 符号+駒+打 のようなKIF形式のParserが実装されていません。
+上記2点を解決するコードを書いてください
+answer: 1. `parseKIFLine` 関数を廃止して、`parseKIF` 内で KIF 形式のパーサーを完成させる
+
+まず、`parseKIFLine` を削除して、代わりに `parseKIF` 関数内で KIF 形式を解析します。
+
+2. 同じ駒を動かす場合や、駒を駒台から打つ場合のパーサーを実装する
+
+"同+駒" や "符号+駒+打" といった KIF 形式に対応するために、新しい正規表現パターンを追加し、駒の移動のパターンに合わせて対応する処理を実装します。
+
+以下に、変更後のコードを示します。
+
+```typescript
+// 他のインポートが続く …
+
+export const parseKIF = (KIF: string) => {
+  const boardHistory: BoardType[] = [initialBoard]
+  const lines = KIF.split(/\r?\n/)
+  let prevMove: { toX: number; toY: number } | null = null
+
+  lines.forEach((line, index) => {
+    line = num2num(line)
+    line = kanji2num(line)
+    const matches = line.match(
+      /(\d+) (同|(\d{2}))(\D+)(打)?\((\d{2})?\)/
+    )
+
+    if (matches === null) {
+      throw new Error("Invalid KIF format")
+    }
+
+    const idx = parseInt(matches[1], 10)
+    const direction: "up" | "down" = idx % 2 === 1 ? "up" : "down"
+    const pieceType = Object.keys(PieceDisplay).find(
+      (key) => PieceDisplay[key as keyof typeof PieceDisplay] === matches[4]
+    ) as PieceType
+
+    let toX: number, toY: number
+    if (matches[2] === "同") {
+      if (!prevMove) {
+        throw new Error("Invalid KIF format")
+      }
+      toX = prevMove.toX
+      toY = prevMove.toY
+    } else {
+      toY = parseInt(matches[2].charAt(1), 10) - 1
+      toX = 9 - parseInt(matches[2].charAt(0), 10)
+    }
+
+    let fromX: number | null, fromY: number | null
+    if (matches[5] === "打") {
+      fromX = null
+      fromY = null
+    } else {
+      if (!matches[6]) {
+        throw new Error("Invalid KIF format")
+      }
+      fromY = parseInt(matches[6].charAt(1), 10) - 1
+      fromX = 9 - parseInt(matches[6].charAt(0), 10)
+    }
+
+    const move = {
+      direction,
+      pieceType,
+      fromX,
+      fromY,
+      toX,
+      toY,
+      upKomadai: { ...boardHistory[boardHistory.length - 1].upKomadai },
+      downKomadai: { ...boardHistory[boardHistory.length - 1].downKomadai },
+    }
+
+    prevMove = { toX, toY }
+
+    boardHistory.push(
+      updateBoardAndKomadai({
+        board: boardHistory[boardHistory.length - 1],
+        move,
+      })
+    )
+  })
+
+  return boardHistory
+}
+```

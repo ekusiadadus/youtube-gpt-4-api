@@ -1,0 +1,161 @@
+model: gpt-4
+time: 0:02:14.091928
+question: 
+
+```TypeScript
+import { Container, Box, Grid, Typography } from "@mui/material"
+import Accordion from "@mui/material/Accordion"
+import AccordionSummary from "@mui/material/AccordionSummary"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { APIDocs } from "../../APIDocs"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+
+
+
+export const APIKey = () => {
+  console.log("APIKey")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+
+  console.log("botID", botID)
+  console.log("companyID", companyID)
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Grid container justifyContent="flex-end">
+            <Grid item xs={13}>
+              <Typography variant="h5">外部連携</Typography>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {/* <ReactMarkdown>{markdown}</ReactMarkdown> */}
+            {/* <SyntaxHighlighter language={"shell"} style={prism}>
+          {"curl -X hhoho"}
+      </SyntaxHighlighter> */}
+            <APIDocs />
+          </AccordionDetails>
+        </Accordion>
+      </Box>
+    </>
+  )
+}
+```
+
+上のコードで、埋め込みようのHTMLをユーザー側にモーダルで表示したいです。
+
+埋め込みようのHTMLは、以下のような感じです。
+
+```html
+    <script
+      id="test"
+      type="text/javascript"
+      async
+      src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+    ></script>
+    <script type="text/javascript">
+      const script = document.getElementById("test");
+      script.addEventListener("load", () => {
+        globalThis.run({ id: "ここにBOT_IDを埋め込む" });
+      });
+    </script>
+
+```
+
+
+id の箇所に、動的にcompany_id, bot_idを埋め込みたいです。
+最初のTypeScriptのコードに続きを書いてください。
+
+
+answer: 以下のコードを追加して、埋め込み用のHTMLコードをモーダルで表示する機能を実装します。
+
+まず、モーダルの表示/非表示用のstateを追加し、ボタンを追加してモーダルを開くイベントを設定します。
+
+その後、モーダル用のコンポーネントを実装して、埋め込み用のHTMLコードを表示します。`botID` と `companyID` を動的に埋め込みます。
+
+```TypeScript
+import { Container, Box, Grid, Typography, Button, Modal, TextField } from "@mui/material"
+// import other required components here
+
+export const APIKey = () => {
+  // ...existing code
+
+  const [modalOpen, setModalOpen] = React.useState(false)
+  const handleModalOpen = () => setModalOpen(true)
+  const handleModalClose = () => setModalOpen(false)
+
+  const embedCode = `
+    <script
+      id="test"
+      type="text/javascript"
+      async
+      src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+    ></script>
+    <script type="text/javascript">
+      const script = document.getElementById("test");
+      script.addEventListener("load", () => {
+        globalThis.run({ id: "${botID}" });
+      });
+    </script>
+  `
+
+  return (
+    <>
+      {/* ...existing code */}
+
+        <Button variant="contained" color="primary" onClick={handleModalOpen}>
+          Embed Code
+        </Button>
+
+        <Modal
+          open={modalOpen}
+          onClose={handleModalClose}
+          aria-labelledby="embed-code-modal"
+          aria-describedby="embed-code-modal-description"
+        >
+          <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '80%', p: 4, bgcolor: 'background.paper', borderRadius: 1 }}>
+            <Typography id="embed-code-modal" variant="h6" component="h2">
+              Embed Code
+            </Typography>
+            <TextField
+              id="embed-code-modal-description"
+              fullWidth
+              multiline
+              rows={4}
+              value={embedCode}
+              readOnly
+            />
+            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+              <Button color="primary" onClick={handleModalClose}>
+                Close
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
+
+        {/* ... */}
+      </Box>
+    </>
+  )
+}
+```
+
+このコードにより、"Embed Code" ボタンを押すと、埋め込み用のHTMLコードが表示されるモーダルが開きます。

@@ -1,0 +1,892 @@
+model: gpt-4
+time: 0:01:41.502546
+question: ```
+from __future__ import annotations
+import json
+import os
+import logging
+import time
+from collections import OrderedDict
+
+try:
+    from decorators import handle_exception, notify_handler_call
+
+    from params import Params
+    from crypter import decrypt
+    from models import HistoryMeta, ResourceType, ChatHistory, AnnotationMeta
+    from repository import PromptSettingClient
+    from repository.vector_db import VectorDBClient
+    from repository.repository import (
+        ResourceMetaRepository,
+        ChatHistoryRepo,
+        ResourceMetaClient,
+        ChatHistoryClient,
+    )
+
+except Exception:
+    import sys
+
+    sys.path.append("amplify/backend/function/kittbackenddevUtilLayer/lib/python")
+    from decorators import handle_exception, notify_handler_call
+
+    from params import Params
+    from crypter import decrypt
+    from models import HistoryMeta, ResourceType, ChatHistory, AnnotationMeta
+    from repository import PromptSettingClient
+    from repository.vector_db import VectorDBClient
+    from repository.repository import (
+        ResourceMetaRepository,
+        ChatHistoryRepo,
+        ResourceMetaClient,
+        ChatHistoryClient,
+    )
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+env = os.environ["ENV"]
+
+# Retryで回復が見込まれるエラー群
+from openai.error import (
+    Timeout, APIError, APIConnectionError,
+    RateLimitError, ServiceUnavailableError
+)
+
+class MissingBotAPIKey(Exception):
+    pass
+
+from langchain.chains import LLMChain
+from langchain.prompts.prompt import PromptTemplate
+from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
+
+from typing import Any, Dict, List, Union
+
+import boto3
+from langchain.schema import AgentAction, AgentFinish, LLMResult
+
+from langchain.callbacks.base import CallbackManager
+from langchain.callbacks.base import BaseCallbackHandler
+
+RATE_LIMIT_ERR_MSG = "RateLimit上限に到達しています。 再度お試しください。"
+LLM_API_ERR_MSG = "LLM Server のErrorが発生しました。 しばらくしてから再度お試しください。"
+SERVER_ERR_MSG = "InternelServer Errorが発生しました。 しばらくしてから再度お試しください。"
+MISSING_BOT_API_KEY_MSG = "BotにAPIKeyが設定されていません。"
+
+
+class WebsocketChatClient:
+    def __init__(self, connection_id: str, domain_name: str, stage: str):
+        self.connection_id = connection_id
+        self.domain_name = domain_name
+        self.stage = stage
+        self.client = boto3.client(
+            "apigatewaymanagementapi", endpoint_url=f"https://{domain_name}/{stage}"
+        )
+        self._closed = False
+
+    def send_msg(self, msg: str):
+        data = json.dumps({
+            "type": "msg",
+            "message": msg
+        })
+        self.client.post_to_connection(
+            Data=data,
+            ConnectionId=self.connection_id
+        )
+
+    def send_err(self, err_name, err_msg: str):
+        data = json.dumps({
+            "type": "err",
+            "name": err_name,
+            "message": err_msg
+        })
+        self.client.post_to_connection(
+            Data=data,
+            ConnectionId=self.connection_id
+        )
+
+    def send_end(self, data: dict):
+        data['type'] = 'end'
+        self.client.post_to_connection(
+            Data=json.dumps(data),
+            ConnectionId=self.connection_id
+        )
+        self.close()
+
+    def close(self):
+        if not self._closed:
+            # delete connection が先
+            self.client.delete_connection(ConnectionId=self.connection_id)
+            self.client.close()
+            self._closed = True
+
+
+class WebsocketCallbackHandler(BaseCallbackHandler):
+    """callbak handler for aws websocket"""
+
+    def __init__(
+        self,
+        ws_client: any,  # WebsocketChatClient
+        referred_docs: list,
+        splitter=None,
+    ) -> None:
+        super().__init__()
+        self.client = ws_client
+        self.referred_docs = referred_docs
+        self.splitter = splitter
+
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> None:
+        """Run when LLM starts running."""
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        """Run on new LLM token. Only available when streaming is enabled."""
+        if self.splitter:
+            token = self.splitter.apply_stream(token)
+            if token == "":
+                return
+        self.client.send_msg(token)
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Run when LLM ends running."""
+        data = {"documents": self.referred_docs}
+        self.client.send_end(data)
+        self.client.close()
+
+    def on_llm_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Run when LLM errors."""
+        """
+        メモ:
+        LangChainのretryを行わせずにここで retry を自前で行って、
+        error => retry の度にユーザへ現状を通知することもできる
+        """
+
+    def on_chain_start(
+        self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any
+    ) -> None:
+        """Run when chain starts running."""
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Run when chain ends running."""
+
+    def on_chain_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Run when chain errors."""
+
+    def on_tool_start(
+        self, serialized: Dict[str, Any], input_str: str, **kwargs: Any
+    ) -> None:
+        """Run when tool starts running."""
+
+    def on_agent_action(self, action: AgentAction, **kwargs: Any) -> Any:
+        """Run on agent action."""
+        pass
+
+    def on_tool_end(self, output: str, **kwargs: Any) -> None:
+        """Run when tool ends running."""
+
+    def on_tool_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Run when tool errors."""
+
+    def on_text(self, text: str, **kwargs: Any) -> None:
+        """Run on arbitrary text."""
+
+    def on_agent_finish(self, finish: AgentFinish, **kwargs: Any) -> Any:
+        """Run on agent finish."""
+
+
+def get_websocket_callback_manager(
+    ws_client: any,  # WebsocketChatClient
+    referred_docs: list,
+    splitter=None,
+):
+    """Callback manager with its own handler for AWS Websocket API."""
+    cbHandler = WebsocketCallbackHandler(
+        ws_client=ws_client,
+        referred_docs=referred_docs,
+        splitter=splitter,
+    )
+    return CallbackManager([cbHandler])
+
+
+pinecone_api_key = Params().get_parameter(os.environ["PINECONE_API_KEY"])
+
+resource_meta_client = ResourceMetaClient(env=env)
+resource_meta_repository = ResourceMetaRepository(resource_client=resource_meta_client)
+bot_repository = resource_meta_repository  # 高速化のために既存のものを参照渡し
+history_meta_repository = resource_meta_repository  # 高速化のために既存のものを参照渡し
+prompts_client = PromptSettingClient(env)
+chat_history_repository = ChatHistoryRepo(ChatHistoryClient(env))
+
+
+# プロンプトの定義
+_template = """以下の Chat History を踏まえて、Follow Up Input を Standalone question に言い直してください。
+
+====
+Chat History:
+{chat_history}
+====
+Follow Up Input: {question}
+Standalone question:"""
+CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template(_template)
+
+
+# @handle_exception(logger)
+@notify_handler_call(logger)
+def handler(event, context):
+    body = (
+        json.loads(event["body"]) if isinstance(event["body"], str) else event["body"]
+    )
+    bot_id = body["bot_id"]
+    return post_handler(event, bot_id, body)
+
+
+# これはなぜ関数化されているのか
+def put_history_meta(history_meta: HistoryMeta):
+    return history_meta_repository.put(history_meta)
+
+
+# これはなぜ関数化されているのか
+def put_chat_history(chat_history: ChatHistory):
+    return chat_history_repository.put(chat_history)
+
+
+class Splitter:
+    """
+    Streamされてくる文字列の中で、特定の文字列を見つけて、出力の制御を行う。
+    GPTの出力が不安定で、特定の文字列が出力されないことがあるので、その場合はsafe_close()を呼び出すことで全文を取得することができる。
+    """
+
+    def __init__(self, split_conditions):
+        """
+        Args:
+            split_conditions (list): 出力開始するための文字列のリスト。どれか一つでも出現したら、出力を開始する。
+            空の場合は、Splitter自体が無効化され、すべての文字列が出力される。
+        """
+        self.conditions = split_conditions
+        self.text = ""
+        self.output = ""
+        if split_conditions:
+            self.flag = False  # 何らかの条件が設定されているときには、文字を捨てる
+        else:
+            self.flag = True  # 条件が設定されていないときは、常に出力
+
+    def safe_close(self):
+        """
+        もし何も出力されていなかった場合、入力された全文を返す。
+        出力されていた場合は空の文字列を返すので、apply_streamの後にこの関数を呼び出せば、常に正しい文章を取得できる。
+        """
+        if self.output == "":
+            return self.text
+        else:
+            return ""
+
+    def apply(self, text):
+        """
+        Streamではなくて、一気に文字列を渡す場合に使う。
+        Args:
+            text (str): 入力文字列
+        Returns:
+            str: 出力文字列
+        """
+        result = ""
+        for c in text:
+            result += self.apply_stream(c)
+        return result + self.safe_close()
+
+    def apply_stream(self, token):
+        """
+        Streamで文字を渡す場合に使う。
+        Args:
+            token (str): 入力文字
+        Returns:
+            str: 出力文字。conditionが満たされていない間は、空文字列が返される。
+        """
+
+        # do_output = copy.deepcopy(self.flag)
+        discard_this = False
+
+        # フラグの制御
+        for tgt in self.conditions:
+            f1 = tgt in self.text
+            f2 = tgt in (self.text + token)
+            if (not f1) and f2:
+                self.flag = True
+                discard_this = True  # この文字までは出力しない
+        self.text += token
+
+        # 出力の制御
+        if self.flag:
+            if discard_this:
+                return ""
+            elif token in [" "] and self.output == "":
+                return ""
+            else:
+                self.output += token
+                return token
+        else:
+            return ""
+
+
+def post_handler(event, bot_id: str, request_body: dict):
+    try:
+        timer = OrderedDict()
+        timer["start"] = time.time()
+
+        connectionId = event.get("requestContext", {}).get("connectionId")
+        domain_name = event.get("requestContext", {}).get("domainName")
+        stage = event.get("requestContext", {}).get("stage")
+        # ユーザは既にWebSocketと繋いでいるので, close() できるよう client をまず取得する
+        timer["parse_parameters"] = time.time()
+        ws_client = WebsocketChatClient(connectionId, domain_name, stage)
+
+        company_id = request_body["company_id"]
+        user_id = request_body["user_id"]
+        user_input = request_body["user_input"]
+        user_posted_at = int(time.time())
+
+        logger.info(
+            "👣 post_handler\n\n"
+            + f" # connectionId: {connectionId}\n\n"
+            + f" # user_posted_at: {user_posted_at}\n"
+            + f" # domain_name: {domain_name}\n"
+            + f" # stage: {stage}\n"
+            + f" # company_id: {company_id}\n"
+            + f" # user_id: {user_id}\n\n"
+            + f" # user_input:\n{user_input}\n\n"
+            + f" # request_body:\n{request_body}\n\n"
+        )
+
+        timer["post_handler"] = time.time()
+
+        bot = bot_repository.get(  # api_key取得のためにbotの情報を取得
+                ResourceType.bot,
+                company_id,
+                bot_id)
+
+        if not bot.llm_api_key:
+            logger.error(f"LLM API Key hasn't been set for the bot '{bot.resource_name}'")
+            raise MissingBotAPIKey()
+
+        api_key = bot.llm_api_key
+        logger.info(f"llm_api_key obtained: {api_key}")
+
+        logger.info(
+            "👣 load_bot\n\n"
+            + f" # connectionId: {connectionId}\n\n"
+            + f" # bot_id: {bot_id}\n\n"
+            + f" # bot:\n{bot.to_dict()}\n\n"
+        )
+        timer["load_bot"] = time.time()
+
+        # prep repository
+        resource_meta_repository = ResourceMetaRepository(
+            resource_client=resource_meta_client,
+            vector_client=VectorDBClient(
+                api_key=pinecone_api_key,
+                env=env,
+                openai_api_key=api_key,
+            ),
+        )
+        timer["resource_meta_repository"] = time.time()
+
+        try:
+            prompt_config_id = bot.prompt
+            prompt_config = json.loads(
+                prompts_client.get_default(prompt_config_id + ".json")
+            )
+        except Exception as err:
+            logger.info(
+                f"error loading prompt: {bot.prompt}. use default prompt. Error: {str(err)}"
+            )
+
+            prompt_config_id = "example"
+            prompt_config = json.loads(
+                prompts_client.get_default(prompt_config_id + ".json")
+            )
+        # logger.info(f"prompt_config: {prompt_config}")
+
+        qa_prompt_with_character_text = load_config(
+            prompt_config,
+            key=["PromptSettings", "UserPrompt", "Prompt"],
+            default=None,
+            format=True,
+        )
+        qa_prompt_with_character = PromptTemplate(
+            template=qa_prompt_with_character_text,
+            input_variables=["context", "question"],
+        )
+
+        logger.info(
+            "👣 load_prompt\n\n"
+            + f" # connectionId: {connectionId}\n\n"
+            + f" # bot.prompt: {bot.prompt}\n"
+            + f" # prompt_config_id: {prompt_config_id}\n\n"
+            + f" # prompt_config:\n{prompt_config}\n\n"
+            + f" # qa_prompt_with_character_text:\n{qa_prompt_with_character_text}\n\n"
+        )
+        timer["load_prompt"] = time.time()
+
+        # LLMの修正履歴を取得 (現在はまだ使わないのでコメントアウトしている)
+        # annotations_pairs = resource_meta_repository.search_annotation_pairs(company_id, user_input, annos_refs)
+        # annotations = build_annotation_string(annotations_pairs)
+        # logger.info(annotations)
+
+        # LLMモデルを設定
+        llm_model = "openai"  # Azureを利用できるようになった場合は、ここを動的に変更
+        model_name = "gpt-3.5-turbo"  # 将来、ここも動的に変更
+
+        # Define tokenizer
+        if model_name == "gpt-3.5-turbo":
+            max_tokens = 4096 - 512  # 512は回答のための余白
+        elif model_name == "gpt-4":
+            max_tokens = 8192 - 512  # 512は回答のための余白
+        else:
+            raise NotImplementedError(f"Invalid model_name: {model_name}")
+
+        # ここから、LangChainを呼び出し
+
+        ###############################################
+        # Step1: 過去の質問履歴を統合して、単一の質問にする
+        # Greeting Promptがある場合は無視。少なくとも一対のQAがある場合にcondenseする。
+
+        chat_history = request_body["history"]
+        user_question = request_body["user_input"]
+        max_history_length = None
+        num_tokens = None
+        trial_prompt = None
+
+        # 質問生成 chain を作成
+        llm_without_streaming = build_llm_model(
+            api_key=api_key,
+            model_name=model_name,
+            need_streaming=False,
+            verbose=True,
+            llm_model=llm_model,
+        )
+
+        if len(chat_history) >= 2:
+            chain_condense_question = LLMChain(
+                llm=llm_without_streaming,
+                prompt=CONDENSE_QUESTION_PROMPT,
+                verbose=True,
+            )
+            # 質問履歴も含めて、合計token数がmax_tokensを超えないようにする。また、いずれにせよ6回以上の質問履歴は無視する。
+            # たった1件でもcontext長を超えてしまう場合は、、元の質問をそのまま使う。
+            for history_length in range(min(6, len(chat_history)), 0, -2):
+                trial_prompt = CONDENSE_QUESTION_PROMPT.format(
+                    chat_history=convert_chat_history(chat_history[-history_length:]),
+                    question=user_question,
+                )
+                num_tokens = 0  # len(tokenizer.encode(trial_prompt))
+
+                if num_tokens <= max_tokens:
+                    max_history_length = history_length
+                    break
+                else:
+                    continue
+
+            if max_history_length is not None:
+                condensed_question = chain_condense_question.run(
+                    chat_history=convert_chat_history(
+                        chat_history[-max_history_length:]
+                    ),
+                    question=user_question,
+                    verbose=True,
+                )
+            else:
+                condensed_question = user_question
+        else:
+            condensed_question = user_question
+
+        # logger.info(convert_chat_history(chat_history))
+
+        logger.info(
+            "👣 chain_condense_question\n\n"
+            + f" # connectionId: {connectionId}\n\n"
+            + f" # max_history_length: {max_history_length}\n"
+            + f" # max_tokens: {max_tokens}\n"
+            + f" # num_tokens: {num_tokens}\n\n"
+            + f" # chat_history:\n{chat_history}\n\n"
+            + f" # user_question:\n{user_question}\n\n"
+            + f" # condensed_question:\n{condensed_question}\n\n"
+            + f" # entire prompt:\n{trial_prompt}\n\n"
+        )
+        timer["chain_condense_question"] = time.time()
+
+        ###############################################
+        # Step2: VectorDBから関連する情報を取得する
+        # vector-search docs for user_input
+        references: list[dict[str, str]] = bot.references
+        # logger.info(f"references: {references}")
+        docs_refs: list[str] = [
+            di["resource_id"]
+            for di in list(
+                filter(
+                    lambda item: item.get("resource_type") == "docs",
+                    references,
+                )
+            )
+        ]
+        # annos_refs: list[str] = [
+        #    f"annotation#{di['resource_id']}"
+        #    for di in list(
+        #        filter(
+        #            lambda item: item.get("resource_type") == "annotation", references  # noqa
+        #        )
+        #    )
+        # ]
+        searched_docs_meta = resource_meta_repository.search_documents(
+            company_id,
+            condensed_question,
+            docs_refs,
+        )
+
+        # 最大token数上限を超えないように選定
+        facts = build_facts_string(searched_docs_meta)
+
+        logger.info(
+            "👣 search_docs\n\n"
+            + f" # connectionId: {connectionId}\n\n"
+            + f" # condensed_question: {condensed_question}\n"
+            + f" # max_tokens: {max_tokens}\n"
+            + f" # num_tokens: {num_tokens}\n"
+            + f" # docs_refs:\n{docs_refs}\n\n"
+            + f" # searched_docs_meta:\n{searched_docs_meta}\n\n"
+            + f" # facts:\n{facts}\n\n"
+        )
+        timer["search_docs"] = time.time()
+
+        ###############################################
+        # Step3: QAを実施する。
+
+        # 参照した Document のリストを作成
+        referred_docs = docs_to_referred_sources(searched_docs_meta)
+        # websocket用の callback handler を生成
+        callback_manager = get_websocket_callback_manager(
+            ws_client=ws_client,
+            referred_docs=referred_docs,
+            splitter=Splitter(
+                prompt_config["PromptSettings"]["UserPrompt"]["Splitter"]
+            ),
+        )
+        timer["callback_manager"] = time.time()
+        # QA回答をする chain を作成
+        llm_with_streaming = build_llm_model(
+            api_key=api_key,
+            model_name=model_name,
+            need_streaming=True,
+            verbose=True,
+            callback_manager=callback_manager,
+            llm_model=llm_model,
+        )
+        timer["llm_with_streaming"] = time.time()
+
+        chain_factorial_qa_with_character = LLMChain(
+            llm=llm_with_streaming,
+            prompt=qa_prompt_with_character,
+            verbose=False,
+        )
+        timer["chain_factorial_qa_with_character"] = time.time()
+        answer_with_character = chain_factorial_qa_with_character.run(
+            context=facts,
+            question=condensed_question,
+        )
+        logger.info(
+            "👣 qa_prompt_with_character\n\n"
+            + f" # connectionId: {connectionId}\n\n"
+            + f" # condensed_question:\n{condensed_question}\n\n"
+            + f" # answer_with_character: {answer_with_character}\n\n"
+            + f" # facts:\n{facts}\n\n"
+        )
+        timer["qa_prompt_with_character"] = time.time()
+
+        final_response = answer_with_character
+
+        ###############################################
+        # チャット履歴の保存
+        # humanからの問いかけの保存
+        chat_history_user = ChatHistory.create(
+            # user_inputの記録,updated情報は不要,chain.runする前に記録
+            bot_id=bot_id,
+            user_id=user_id,
+            created_at=request_body["created_at"]
+            if "created_at" in request_body
+            else 1681706665,
+            posted_at=user_posted_at,
+            posted_by=user_id,
+            message=user_input,
+        )
+
+        # logger.info(f"chat_history: {chat_history_user.to_dict()}")
+        put_chat_history(chat_history=chat_history_user)
+
+        # aiからの回答の保存
+        chat_history_bot = ChatHistory.create(  # botのrespの記録,updated情報は不要
+            bot_id=bot_id,
+            user_id=user_id,
+            created_at=request_body["created_at"]
+            if "created_at" in request_body
+            else 1681706665,
+            posted_at=int(time.time()),
+            posted_by=bot_id,
+            message=final_response,
+        )
+
+        # logger.info(f"chat_history: {chat_history_bot.to_dict()}")
+        put_chat_history(chat_history=chat_history_bot)
+
+        logger.info("Chat history has been put.")
+
+        # history_metaの保存
+        history_meta = HistoryMeta.create(
+            company_id=company_id,
+            resource_id=connectionId,
+            resource_name=connectionId,
+            created_by=user_id,
+            updated_by=user_id,
+            description=final_response,
+        )
+
+        # logger.info(f"history_meta: {history_meta.to_dict()}")
+        put_history_meta(history_meta=history_meta)
+
+        logger.info(
+            "👣 put_chat_history\n\n"
+            + f" # connectionId: {connectionId}\n\n"
+            + f" # chat_history(user):\n{chat_history_user.to_dict()}\n\n"
+            + f" # chat_history(bot):\n{chat_history_bot.to_dict()}\n\n"
+            + f" # history_meta:\n{history_meta.to_dict()}\n\n"
+        )
+        timer["put_chat_history"] = time.time()
+
+        # timerを保存
+        timer_diff = OrderedDict()
+        for k in timer:
+            timer_diff[k] = timer[k] - timer["start"]
+        logger.info(
+            "⏱️ timer\n\n"
+            + f" # connectionId: {connectionId}\n\n"
+            + f" # timer_diff:\n{json.dumps(timer_diff, indent=4)}\n\n"
+            + f" # timer:\n{json.dumps(timer, indent=4)}\n\n"
+        )
+
+        return {'statusCode': 200}
+    except MissingBotAPIKey as e:
+        # 通常発生が想定されるエラーのため info
+        logger.info(f"Error: {e}")
+        ws_client.send_err("MissingBotAPIKey", MISSING_BOT_API_KEY_MSG)
+        ws_client.close()
+        return {'statusCode': 200}
+    except RateLimitError as e:
+        # 現状の max_retry=3 だとここまでは滅多に来ない
+
+        logger.info(f"Error: {e}")
+        logger.info(f"Message: {str(e)}")
+        ws_client.send_err(
+            "RateLimit",
+            RATE_LIMIT_ERR_MSG,
+        )
+        ws_client.close()
+        return {'statusCode': 200}
+    except (APIConnectionError, APIError, ServiceUnavailableError, Timeout) as e:
+        # 通常発生が想定されるエラーのため info
+        logger.info(f"Error: {e}")
+        logger.info(f"Message: {str(e)}")
+        ws_client.send_err(
+            "LLMAPI",
+            LLM_API_ERR_MSG,
+        )
+        ws_client.close()
+        return {'statusCode': 200}
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        logger.error(f"Message: {str(e)}")
+        ws_client.send_err(
+            "InternalServer",
+            SERVER_ERR_MSG,
+        )
+        ws_client.close()
+        return {
+            "statusCode": 500,
+            "headers": {
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+                "Content-Type": "application/json",
+            },
+            "body": json.dumps({"Error": str(e)}),
+        }
+
+
+def get_formatted_text(text):
+    """
+    JSONファイルを読んだときに、リスト形式になっているものを、改行で結合する。
+    """
+    if isinstance(text, str):
+        return text
+    elif isinstance(text, list):
+        return "\n".join(text)
+
+
+def load_config(config, key, default=None, format=True):
+    """
+    configからkeyを読み込む。存在しなかった場合は、default値を返す.
+    Args:
+        config (dict): 設定ファイルの辞書
+        key (list[str]): 設定ファイルのkey。深い階層のものを指定できるよう、listで指定する。strを指定した場合は、そのままkeyとして扱う。
+        default (Any, optional): keyが存在しなかった場合のデフォルト値. Defaults to None.
+        format (bool, optional): 設定ファイルの値がリストの場合、改行で結合するかどうか. Defaults to True.
+    Returns:
+        str: keyに対応する設定ファイルの値
+    """
+    if isinstance(key, str):
+        key = [key]
+    item = config
+    for k in key:
+        if k in item:
+            item = item[k]
+        else:
+            logger.info(
+                f"load_config(): Couldn't find key in config. Use default. key={key}, value={default}"
+            )
+            return default
+    logger.info(f"load_config(): {key}")
+    if format:
+        output = get_formatted_text(item)
+    else:
+        output = item
+    logger.info(f"load_config(): Found key in config. key={key}, value={output}")
+    return output
+
+
+def convert_chat_history(chat_history: list[dict]):
+    """
+    chat_historyをstringに変換する。
+    Args:
+        chat_history (list[dict]): フロントエンドから渡されたチャット履歴のメッセージ。"type"と"message"のkeyを持つdictのlist。
+        "type"は、"ai"と"human"の2種類。
+        https://www.notion.so/spiralai/BotChat-API-68aad0755564432d898e9fce9b5d21b9?pvs=4
+    Returns:
+        output (str): チャット履歴のメッセージをstringに変換したもの。"Human: XXX\nAssistant: XXX"といった形式で返す。
+    """
+    output = ""
+    for chat in chat_history:
+        if chat["type"] == "ai":
+            output += "Assistant: " + chat["message"] + "\n"
+        elif chat["type"] == "human":
+            output += "Human: " + chat["message"] + "\n"
+        else:
+            raise ValueError(f"chat_historyのtypeが不正です。{chat['type']}")
+    return output[:-1]  # 最後の'\n'を削除
+
+
+def build_facts_string(searched_docs_meta: list):
+    # facts = ""
+    # for doc in searched_docs_meta:
+    #     facts += "Reference Name: " + doc.resource_name + "  "
+    #     if doc.resource_url:
+    #         facts += "Reference URL: " + doc.resource_url + "  "
+    #     facts += 'Reference Text: """' + doc.resource_text + '"""  '
+    # return facts
+
+    # 高速化のため、一旦リストに入れてからjoinする
+    def create_fact_from_doc(doc) -> str:
+        base = "Reference Name: " + doc.resource_name + "  "
+        url = "Reference URL: " + doc.resource_url + "  " if doc.resource_url else ""
+        text_ = 'Reference Text: """' + doc.resource_text + '"""  '
+        return "".join([base, url, text_])
+    return "".join([create_fact_from_doc(doc) for doc in searched_docs_meta])
+
+
+def build_annotation_string(
+    annotation_pair_list: list[tuple[AnnotationMeta, AnnotationMeta]]
+):
+    annotations: str = ""
+    for question, answer in annotation_pair_list:
+        if question.description is None:
+            continue
+        annotations += "Sample Question: " + question.description + " \n"
+        annotations += "Sample Answer: " + answer.description + " \n\n"
+
+    return annotations
+
+
+def build_llm_model(
+    api_key,
+    model_name,
+    need_streaming=False,
+    verbose=False,
+    callback_manager=None,
+    llm_model="openai",
+):
+    if callback_manager is None:
+        need_streaming = False
+        verbose = False
+
+    if llm_model == "azure":
+        llm = AzureChatOpenAI(
+            openai_api_key=api_key,
+            temperature=0.0,
+            model_name=model_name,
+            max_retries=3,
+            request_timeout=60,
+            streaming=need_streaming,
+            verbose=verbose,
+            callback_manager=callback_manager,
+        )
+    elif llm_model == "openai":
+        llm = ChatOpenAI(
+            openai_api_key=api_key,
+            temperature=0.0,
+            model_name=model_name,
+            max_retries=3,
+            request_timeout=60,
+            streaming=need_streaming,
+            verbose=verbose,
+            callback_manager=callback_manager,
+        )
+    return llm
+
+
+def docs_to_referred_sources(docs: List) -> List[dict]:
+    # 返却値を root id に変換しつつ, 重複した id を除去する
+    cache = {}
+    for doc in docs:
+        root_id = "root#" + doc.resource_id.split("#")[1]
+        cache[root_id] = doc
+    return [
+        {
+            "resource_id": resource_id,
+            "resource_name": doc.resource_name,
+            "resource_url": doc.resource_url,
+        }
+        for resource_id, doc in cache.items()
+    ]
+
+
+if __name__ == "__main__":
+    con = {
+        # "body": '{"bot_id2": "7a42ed26-dc8f-46bc-9c4e-15306cc0279b", "user_id": "sample","created_at":1681706665,"posted_at":1681779536,"posted_by":"sample","message":"UPDATE3!!","updated_by":"annotatorID","updated_at":1681875192,"flag":false}'
+        "body": '{"user_input": "日本の内閣総理大臣の名前は？","company_id": "company_id","bot_id":"7a42ed26-dc8f-46bc-9c4e-15306cc0279b","updated_by":"anotator idddd","user_id":"sample","history":[{"type":"human","message":"明日の天気は？"},{"type":"ai","message":"わかりません"}]}'
+        # "body": '{"bot_id": "7a42ed26-dc8f-46bc-9c4e-15306cc0279b", "user_id": "sample","created_at":1681706665,"posted_at":1681779536,"posted_by":"sample","message":"UPDATE!!","updated_by":"annotatorID","flag":false}'
+    }
+    a = handler(con, {})
+    print(a)
+```
+
+answer_with_character が遅いです。
+速度を改善するために、このコードでできることを教えてください。
+answer: コードのパフォーマンスを改善するにはいくつかの方法があります。以下にいくつかの提案を示しますが、完全な解決策ではないかもしれません。最適化は、ユースケースと要件によって異なる結果をもたらすことがあります。
+
+1. 外部リソースへのアクセスを減らす: コード内で多くの外部リソース（データベースやAPIなど）にアクセスしています。これらの呼び出しは通常、ローカル操作よりも遅く、パフォーマンスのボトルネックになる可能性があります。API呼び出しやデータベースクエリを減らすか、バッチ処理で呼び出すことで、パフォーマンスが向上することがあります。
+
+2. ログ出力を最適化する: ログ出力は、実行時間に影響することがあります。必要なものだけをログに記録することで、パフォーマンスを向上させることができます。ログレベルを適切に設定し、デバッグログや情報ログを本番環境で無効にすることを検討してください。
+
+3. キャッシュを使用する: 頻繁に使用されるデータや計算結果は、キャッシュに保存して再利用することで、パフォーマンスを向上させることができます。Pythonの組み込みの`functools.lru_cache`デコレータを使用するか

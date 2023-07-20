@@ -1,0 +1,90 @@
+model: gpt-4
+time: 0:00:48.301191
+question: ```
+from src.domain.model.user import User
+from src.domain.repository.user import IUserRepository
+
+
+class UserService:
+    def __init__(self, user_repository: IUserRepository):
+        self.user_repository = user_repository
+
+    def find_by_id(self, user_id):
+        return self.user_repository.find_by_id(user_id)
+
+    def find_by_email(self, email):
+        return self.user_repository.find_by_email(email)
+
+    def save(self, user: User):
+        return self.user_repository.save(user)
+
+    def delete(self, user):
+        return self.user_repository.delete(user)
+```
+
+service Error を定義して、User Not Found 等のエラーをハンドラーに返すようにしたいです。
+コードを修正してください。
+answer: 以下のように`UserNotFoundError`例外を定義して、それらのエラーに対応するハンドラーを実装できます。
+
+```python
+from src.domain.model.user import User
+from src.domain.repository.user import IUserRepository
+
+
+class UserNotFoundError(Exception):
+    pass
+
+
+class UserService:
+    def __init__(self, user_repository: IUserRepository):
+        self.user_repository = user_repository
+
+    def find_by_id(self, user_id):
+        user = self.user_repository.find_by_id(user_id)
+        if user is None:
+            raise UserNotFoundError(f"User with id {user_id} not found.")
+        return user
+
+    def find_by_email(self, email):
+        user = self.user_repository.find_by_email(email)
+        if user is None:
+            raise UserNotFoundError(f"User with email {email} not found.")
+        return user
+
+    def save(self, user: User):
+        return self.user_repository.save(user)
+
+    def delete(self, user):
+        return self.user_repository.delete(user)
+```
+
+これで `find_by_id` および `find_by_email` メソッドがユーザーが見つからない場合に `UserNotFoundError` をスローします。 これらのメソッドを呼び出す際には、適切に例外をキャッチして処理を行う必要があります。
+
+例えば、Flaskアプリケーションでこのサービスを使う場合、以下のようにエラーハンドラーを定義できます。
+
+```python
+from flask import Flask, jsonify
+from your_module import UserService, UserNotFoundError
+
+app = Flask(__name__)
+
+
+@app.route("/user_by_id/<user_id>")
+def get_user_by_id(user_id):
+    user_service = UserService()
+    try:
+        user = user_service.find_by_id(user_id)
+        return jsonify(user.to_dict())
+    except UserNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+
+
+@app.route("/user_by_email/<email>")
+def get_user_by_email(email):
+    user_service = UserService()
+    try:
+        user = user_service.find_by_email(email)
+        return jsonify(user.to_dict())
+    except UserNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+```

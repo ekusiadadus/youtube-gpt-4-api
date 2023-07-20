@@ -1,0 +1,133 @@
+model: gpt-4
+time: 0:02:01.230543
+question: 
+
+```python
+class UserClient(UserClientBase):
+    def __init__(self, env: str, region: str = "ap-northeast-1"):
+        self.table_name = f"user_{env}"
+        self.company_id_index = f"CompanyIdIndex-{env}"
+        self.client = Session().client("dynamodb", region_name=region)
+
+    def get(self, user_id: str, company_id: str) -> User:
+        partitionKey = user_id
+        sortKey = company_id
+
+        parameters = {
+            "TableName": self.table_name,
+            "IndexName": self.company_id_index,
+            "Select": "ALL_ATTRIBUTES",
+            "KeyConditionExpression": "user_id = :user_id AND company_id = :company_id",
+            "ExpressionAttributeValues": {
+                ":user_id": {"S": user_id},
+                ":company_id": {"S": company_id},
+            },
+        }
+
+        res = self.client.query(**parameters)
+        if "Items" not in res:
+            raise KeyError(
+                f'''Item with the couple of keys not found.
+            Partition Key: {partitionKey}, Sort Key: {sortKey}'''
+            )
+        return User.from_dynamo_item(res["Items"][0])
+
+    def get_or_none(self, user_id: str, company_id: str) -> User | None:
+        try:
+            user: User = self.get(user_id=user_id, company_id=company_id)
+            return user
+        except Exception:
+            return None
+
+    def create(self, user_id: str, company_id: str, family_name: str, given_name: str, email: str) -> User:
+        item = {
+            "user_id": {"S": user_id},
+            "company_id": {"S": company_id},
+            "family_name": {"S": family_name},
+            "given_name": {"S": given_name},
+            "email": {"S": email}
+        }
+
+        parameters = {
+            "TableName": self.table_name,
+            "Item": item
+        }
+
+        self.client.put_item(**parameters)
+        return User.from_dynamo_item(item)
+```
+
+あたらしいLambda関数を作成したいです。
+具体的には、Userのupdateを行うようなLambda関数を作成したいです。
+サンプルjsonと、Lambda関数のコードを書いてください。
+
+
+
+answer: まず、サンプルjsonになります。このjsonは、Lambda関数に渡すイベントとして使用されます。
+
+```json
+{
+  "user_id": "example_user_id",
+  "company_id": "example_company_id",
+  "family_name": "Updated Family Name",
+  "given_name": "Updated Given Name",
+  "email": "updated_email@example.com"
+}
+```
+
+次に、`UserClient`クラスに`update`メソッドを追加します。
+
+```python
+class UserClient(UserClientBase):
+    ...
+    def update(self, user_id: str, company_id: str, family_name: str, given_name: str, email: str) -> User:
+        update_expression = "SET family_name = :family_name, given_name = :given_name, email = :email"
+        expression_attribute_values = {
+            ":family_name": {"S": family_name},
+            ":given_name": {"S": given_name},
+            ":email": {"S": email}
+        }
+
+        parameters = {
+            "TableName": self.table_name,
+            "Key": {
+                "user_id": {"S": user_id},
+                "company_id": {"S": company_id}
+            },
+            "UpdateExpression": update_expression,
+            "ExpressionAttributeValues": expression_attribute_values,
+            "ReturnValues": "UPDATED_NEW"
+        }
+
+        res = self.client.update_item(**parameters)
+        return User.from_dynamo_item(res["Attributes"])
+```
+
+最後に、新しいLambda関数のコードを書きます。
+
+```python
+import json
+import os
+from user_client import UserClient
+
+def lambda_handler(event, context):
+    user_id = event["user_id"]
+    company_id = event["company_id"]
+    family_name = event["family_name"]
+    given_name = event["given_name"]
+    email = event["email"]
+
+    env = os.environ["ENV"]
+    user_client = UserClient(env)
+
+    updated_user = user_client.update(user_id, company_id, family_name, given_name, email)
+
+    response = {
+        "statusCode": 200,
+        "body": json.dumps(updated_user.to_dict())
+    }
+
+    return response
+```
+
+上記のコードでは、`event`から必要な情報を取得し、`UserClient`の`update`メソッドを使用して、ユーザー情報を更新しています。その後、更新されたユーザー情報をレスポンスとして返しています。

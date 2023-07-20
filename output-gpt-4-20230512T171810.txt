@@ -1,0 +1,138 @@
+model: gpt-4
+time: 0:01:51.231050
+question: 
+
+```python
+import time
+import json
+import os
+import logging
+
+from botocore.exceptions import ClientError
+
+try:
+    from repository import UserClient
+    from models import User
+except Exception:
+    import sys
+
+    sys.path.append("amplify/backend/function/kittbackenddevUtilLayer/lib/python")
+    from repository import UserClient
+    from models import User
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+env = os.environ["ENV"]
+
+ERROR_USER_NOT_FOUND = "user not found"
+ERROR_UPDATE_USER = "Error in updating user to DynamoDB"
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+}
+
+def handle_error(status_code, error_message):
+    return {
+        "statusCode": status_code,
+        "headers": CORS_HEADERS,
+        "body": json.dumps({"error": error_message}),
+    }
+
+
+def handler(event, context):
+    input_data = json.loads(event["body"])
+
+    user_id = input_data["user_id"]
+    company_id = input_data["company_id"]
+    family_name = input_data["family_name"]
+    given_name = input_data["given_name"]
+    email = input_data["email"]
+
+    user_table_client = UserClient(env=env)
+
+    user = user_table_client.get(user_id=user_id, company_id=company_id)
+
+    if user is None:
+        logger.error(ERROR_USER_NOT_FOUND)
+        return handle_error(404, ERROR_USER_NOT_FOUND)
+
+    user = User(
+        user_id=user_id,
+        company_id=company_id,
+        family_name=family_name,
+        given_name=given_name,
+        email=email,
+        created_at=user.created_at,
+        updated_at=int(time.time()),
+    )
+
+    try:
+        user_table_client.update(user=user)
+    except ClientError as e:
+        logger.error(e.response["Error"]["Message"])
+        return handle_error(500, ERROR_UPDATE_USER)
+```
+
+```
+{
+    "errorMessage": "list index out of range",
+    "stackTrace": [
+        "  File "/usr/local/lib/python3.8/site-packages/lambda_local/main.py", line 153, in execute
+    result = func(event, context._activate())
+",
+        "  File "amplify/backend/function/updateUser/src/index.py", line 73, in handler
+    user = user_table_client.get(user_id=user_id, company_id=company_id)
+",
+        "  File "/var/www/app/amplify/backend/function/kittbackenddevUtilLayer/lib/python/repository/dynamodb.py", line 426, in get
+    return User.from_dynamo_item(res["Items"][0])
+"
+    ],
+    "errorType": "IndexError"
+}
+```
+
+上のコードで、dynamoDBに存在しない場合の処理をより良いものにしたいです。
+dynamoDBに存在しないときのエラー処理を書いてください。
+
+
+answer: 上記のコードにて、DynamoDBに存在しない場合のエラー処理を追加するには、`UserClient`クラスの`get`メソッドの実装に注目します。`get`メソッドがレコードを見つけられない場合は`None`を返すようにしているため、エラー処理を追加する必要があります。
+
+ハンドラー関数にて、`user`オブジェクトが`None`の場合、エラーメッセージを返すようにしています。ただし、DynamoDBクエリが失敗した場合と区別するために、`get`メソッドを変更して、見つからない場合は`NotFoundException`をスローするようにします。
+
+まず、`UserClient`クラスに以下の例外クラスを追加します。
+
+```python
+class NotFoundException(Exception):
+    pass
+```
+
+次に、`UserClient`クラスの`get`メソッドを以下のように変更します。
+
+```python
+def get(self, user_id, company_id):
+    # ...
+    res = self.table.query(KeyConditionExpression=condition)
+    
+    if not res["Items"]:
+        raise NotFoundException("User not found")
+
+    return User.from_dynamo_item(res["Items"][0])
+```
+
+最後に、`handler`関数を以下のように変更して、`NotFoundException`をキャッチし、適切なエラーレスポンスを返すようにします。
+
+```python
+def handler(event, context):
+    # ...
+    try:
+        user = user_table_client.get(user_id=user_id, company_id=company_id)
+    except NotFoundException as e:
+        logger.error(str(e))
+        return handle_error(404, ERROR_USER_NOT_FOUND)
+    # ...
+```
+
+これにより、DynamoDBに存在しない場合のエラー処理が追加されました。なお、このコードは元のコードと互換性がありますので、クライアントアプリケーションへの影響はありません。

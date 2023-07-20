@@ -1,0 +1,167 @@
+model: gpt-4
+time: 0:00:21.368913
+question: import os
+
+import uvicorn
+from fastapi import APIRouter, Depends, FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
+
+from src.domain.model.user import User
+from src.domain.usercase.user_service import UserService
+from src.infra.client.db.db import PostgresClient
+from src.infra.repository_impl.user import UserClient
+from src.web.handlers.user_handler import UserHandler
+
+app = FastAPI(title="minyoo")
+router = APIRouter()
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    "http://localhost:8080",
+    "http://localhost:3000",
+    "http://localhost:7999",
+    "*",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+
+class Server:
+    """FastAPI server."""
+
+    def __init__(self):
+        self.host = os.getenv("DB_HOST")
+        if self.host is None:
+            raise ValueError("DB_HOST environment variable is not set.")
+
+        self.port = os.getenv("DB_PORT")
+        if self.port is None:
+            raise ValueError("DB_PORT environment variable is not set.")
+
+        self.port = int(self.port)
+
+        self.user = os.getenv("DB_USER")
+        if self.user is None:
+            raise ValueError("DB_USER environment variable is not set.")
+
+        self.password = os.getenv("DB_PASSWORD")
+        if self.password is None:
+            raise ValueError("DB_PASSWORD environment variable is not set.")
+
+        self.database = os.getenv("DB_DATABASE")
+        if self.database is None:
+            raise ValueError("DB_DATABASE environment variable is not set.")
+
+        self.db_client = PostgresClient(host=self.host, port=self.port, user=self.user, password=self.password, database=self.database)
+        self.user_repository = UserClient(db_client=self.db_client, table_name="users")
+        self.user_service = UserService(
+            user_repository=self.user_repository,
+        )
+        self.user_handler = UserHandler(user_service=self.user_service)
+
+    def run(self):
+        uvicorn.run("src.web.init:app", host="0.0.0.0", port=7999, reload=True)
+
+
+def get_server():
+    return Server()
+
+
+@app.get("/healthCheck/")
+def healthcheck():
+    """Endpoint for health checks.
+
+    Returns:
+        str: The status of the server.
+    """
+    return "Health - OK"
+
+
+class UserOutput(BaseModel):
+    id: str
+    name: str
+    email: EmailStr
+
+
+@app.get("/users/{user_id}", response_description="Returns a list of users.")
+async def find_by_id(user_id: str, server: Server = Depends(get_server)):
+    """Endpoint to get a list of users.
+
+    Returns:
+        dict: A dictionary with a list of users.
+    """
+    return server.user_handler.find_by_id(user_id=user_id)
+
+
+class FindByEmailInput(BaseModel):
+    email: EmailStr
+
+
+class FindByEmailOutput(BaseModel):
+    id: str
+    name: str
+    email: EmailStr
+
+
+@app.post("/users/email", response_description="Returns a user.")
+async def find_by_email(input: FindByEmailInput, server: Server = Depends(get_server)):
+    """Endpoint to get a list of users.
+
+    Returns:
+        dict: A dictionary with a list of users.
+    """
+
+    response = server.user_handler.find_by_email(email=input.email)
+
+    return response
+
+
+class CreateUserInput(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+
+@app.post("/users/", response_description="Creates a new user.")
+async def save(input: CreateUserInput, server: Server = Depends(get_server)):
+    """Endpoint to create a new user.
+
+    Returns:
+        dict: A dictionary with the new user.
+    """
+
+    user = User.new(name=input.name, email=input.email, password=input.password)
+    return server.user_handler.save(user=user)
+
+
+how to add websocket URL "/ws/chat/{room_id}/" to FastAPI?
+
+answer: To add a WebSocket with URL "/ws/chat/{room_id}/" to FastAPI, you'll need to create a new async function and use the WebSocket parameter in that function. You can also use the FastAPI.websocket decorator for this purpose.
+
+Here's an example of how you can add a WebSocket to FastAPI for the given URL:
+
+```python
+from fastapi import WebSocket
+
+# Other imports and code
+
+@app.websocket("/ws/chat/{room_id}/")
+async def websocket_endpoint(websocket: WebSocket, room_id: int):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"You sent: {data} in room {room_id}")
+
+# Rest of the code
+```
+
+In this example, we declare a new WebSocket endpoint using the @app.websocket decorator. The function websocket_endpoint takes two parameters: a WebSocket object and an integer room_id path parameter.
+
+With this setup, clients can connect to the WebSocket, send and receive messages within each room. You can further customize this function to handle more complex tasks, such as broadcasting messages to all clients in a room or managing multiple rooms.

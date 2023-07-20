@@ -1,0 +1,161 @@
+model: gpt-4
+time: 0:00:52.611427
+question: ```
+class GenerateResponseType:
+    human_input: str
+    history: str
+    text: str
+
+    def __init__(self, human_input: str, history: str, text: str) -> None:
+        self.human_input = human_input
+        self.history = history
+        self.text = text
+
+
+class WebsocketCallbackClient(BaseCallbackHandler):
+    def __init__(self, ws_client) -> None:
+        self.ws_client = ws_client
+
+
+class MyCustomCallbackHandler(BaseCallbackHandler):
+    """Custom CallbackHandler."""
+
+    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
+        """LLM の処理開始。prompt の内容を出力"""
+        pass
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """LLM の処理終了。何もしない"""
+        pass
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        """LLM から新しい Token が出力。いわゆる Streaming の部分"""
+        pass
+
+    def on_llm_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """LLM の処理中にエラーが発生"""
+        pass
+
+    def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Chain の処理がスタート"""
+        pass
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Chain の処理が終了"""
+        pass
+
+    def on_chain_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """Chain の実行でエラーが発生"""
+        pass
+
+    def on_tool_start(
+        self,
+        serialized: Dict[str, Any],
+        input_str: str,
+        **kwargs: Any,
+    ) -> None:
+        """Tool の実行が開始"""
+        pass
+
+    def on_agent_action(self, action: AgentAction, color: Optional[str] = None, **kwargs: Any) -> Any:
+        """Agent がアクションを実施。Agent の Streaming は大体ここ"""
+        print(action)
+
+    def on_tool_end(
+        self,
+        output: str,
+        color: Optional[str] = None,
+        observation_prefix: Optional[str] = None,
+        llm_prefix: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Tool の使用が終了。Final Answer でなければ[Observation]が出力"""
+        print(output)
+
+    def on_tool_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """Tool の使用でエラーが発生"""
+        pass
+
+    def on_text(
+        self,
+        text: str,
+        color: Optional[str] = None,
+        end: str = "",
+        **kwargs: Optional[str],
+    ) -> None:
+        """Agent の終了時に呼び出される。完全に終了したとき（？）。結果の出力"""
+        print(text)
+
+    def on_agent_finish(self, finish: AgentFinish, color: Optional[str] = None, **kwargs: Any) -> None:
+        """Agent が終了した時に呼び出される。ログの出力"""
+        print(finish.log)
+
+
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str):
+```
+
+src/infra/client/langchain/langchain_client.py に、websocket での通信を行うクライアントを実装しています。
+上のコードをもとに、コードを完了させてください。
+answer: ```python
+import asyncio
+from typing import Dict, List, Optional, Union, Any
+
+from openai_agent.agent.agent import AgentFinish, AgentAction
+from openai_agent.agent.llm import LLMResult
+from openai_agent.utils.callback_handler import (
+    BaseCallbackHandler,
+)
+
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str) -> None:
+        self.model_name = model_name
+        self.api_key = api_key
+
+    async def run(self, input_text: str, history: str, websocket_url: str) -> None:
+        my_callback_handler = MyCustomCallbackHandler()
+        websocket_callback_client = WebsocketCallbackClient(ws_client=self)
+
+        agent_config = {
+            "llm": {
+                "model_name": self.model_name,
+                "api_key": self.api_key,
+                "callback_handler": websocket_callback_client,
+            },
+            "chain": {
+                "tool_config": {
+                    "api_key": self.api_key,
+                },
+            },
+            "callback_handler": my_callback_handler,
+        }
+
+        agent = Agent(agent_config)
+
+        try:
+            await agent.run(input_text, history, websocket_url)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+    def send(self, message: str) -> None:
+        self.ws_client.send(message)
+
+    async def connect(self, websocket_url: str) -> None:
+        async with websockets.connect(websocket_url) as ws:
+            self.ws_client = ws
+            return await ws.recv()
+
+    async def close(self) -> None:
+        if self.ws_client is not None:
+            await self.ws_client.close()
+
+if __name__ == "__main__":
+    model_name = "text-davinci-001"
+    api_key = "your-api-key"
+    input_text = "What is the capital of France?"
+    history = ""
+    websocket_url = "ws://your-websocket-url"
+
+    lang_chain_client = LangChainClient(model_name=model_name, api_key=api_key)
+    asyncio.run(lang_chain_client.run(input_text=input_text, history=history, websocket_url=websocket_url))
+```

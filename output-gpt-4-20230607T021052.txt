@@ -1,0 +1,273 @@
+model: gpt-4
+time: 0:01:07.717671
+question: model: gpt-4
+time: 0:01:28.024372
+question: ```
+from typing import Any, Dict, List, Optional, Union
+
+from langchain.callbacks.base import BaseCallbackHandler
+from langchain.schema import AgentAction, AgentFinish, LLMResult
+
+from src.domain.usecase.chat_service import ChatService
+from src.lib.logger.websocket_connection import ConnectionManager
+
+
+class MyCustomCallbackHandler(BaseCallbackHandler):
+    def __init__(self, bot_id: Optional[str] = None, ws: Optional[ConnectionManager] = None) -> None:
+        super().__init__()
+        self.ws = ws
+        self.bot_id = bot_id
+
+    """Custom CallbackHandler."""
+
+    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
+        pass
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        pass
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        """新しいtokenが来たらprintする"""
+        print("\033[36m" + token + "\033[0m")
+        self.ws.send_message(token, self.bot_id)
+
+    def on_llm_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """Do nothing."""
+        pass
+
+    def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Print out that we are entering a chain."""
+        class_name = serialized["name"]
+        print(f"\n\n\033[1m> Entering new {class_name} chain...\033[0m")
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Print out that we finished a chain."""
+        print("\n\033[1m> Finished chain.\033[0m")
+
+    def on_chain_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """Do nothing."""
+        pass
+
+    def on_tool_start(
+        self,
+        serialized: Dict[str, Any],
+        input_str: str,
+        **kwargs: Any,
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_agent_action(self, action: AgentAction, color: Optional[str] = None, **kwargs: Any) -> Any:
+        """Run on agent action."""
+        print(action)
+
+    def on_tool_end(
+        self,
+        output: str,
+        color: Optional[str] = None,
+        observation_prefix: Optional[str] = None,
+        llm_prefix: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """If not the final action, print out observation."""
+        print(output)
+
+    def on_tool_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """Do nothing."""
+        pass
+
+    def on_text(
+        self,
+        text: str,
+        color: Optional[str] = None,
+        end: str = "",
+        **kwargs: Optional[str],
+    ) -> None:
+        """Run when agent ends."""
+        print(text)
+
+    def on_agent_finish(self, finish: AgentFinish, color: Optional[str] = None, **kwargs: Any) -> None:
+        """Run on agent end."""
+        print(finish.log)
+
+
+class ChatHandler:
+    def __init__(self, chat_service: ChatService) -> None:
+        self.chat_service = chat_service
+
+    def web_socket_chat(self, message: str, bot_id: str, ws: ConnectionManager) -> str:
+        return self.chat_service.web_socket_chat(message, callback=MyCustomCallbackHandler(bot_id, ws))
+
+```
+
+
+```
+from typing import Dict, List
+
+from fastapi import WebSocket
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, bot_id: str):
+        if bot_id in self.active_connections:
+            self.active_connections[bot_id].append(websocket)
+        else:
+            self.active_connections[bot_id] = [websocket]
+        await websocket.accept()
+
+    async def disconnect(self, websocket: WebSocket, bot_id: str):
+        self.active_connections[bot_id].remove(websocket)
+
+    async def send_message(self, message: str, bot_id: str):
+        for connection in self.active_connections[bot_id]:
+            await connection.send_text(message)
+
+```
+
+
+```
+
+```
+[{
+	"resource": "/home/ekusiadadus/dev/minyoo/minyoo/src/web/handlers/chat_handler.py",
+	"owner": "_generated_diagnostic_collection_name_#6",
+	"code": {
+		"value": "reportUnusedCoroutine",
+		"target": {
+			"$mid": 1,
+			"external": "https://github.com/microsoft/pyright/blob/main/docs/configuration.md#reportUnusedCoroutine",
+			"path": "/microsoft/pyright/blob/main/docs/configuration.md",
+			"scheme": "https",
+			"authority": "github.com",
+			"fragment": "reportUnusedCoroutine"
+		}
+	},
+	"severity": 8,
+	"message": "Result of async function call is not used; use \"await\" or assign result to variable",
+	"source": "Pylance",
+	"startLineNumber": 27,
+	"startColumn": 9,
+	"endLineNumber": 27,
+	"endColumn": 49
+},{
+	"resource": "/home/ekusiadadus/dev/minyoo/minyoo/src/web/handlers/chat_handler.py",
+	"owner": "_generated_diagnostic_collection_name_#6",
+	"code": {
+		"value": "reportOptionalMemberAccess",
+		"target": {
+			"$mid": 1,
+			"external": "https://github.com/microsoft/pyright/blob/main/docs/configuration.md#reportOptionalMemberAccess",
+			"path": "/microsoft/pyright/blob/main/docs/configuration.md",
+			"scheme": "https",
+			"authority": "github.com",
+			"fragment": "reportOptionalMemberAccess"
+		}
+	},
+	"severity": 8,
+	"message": "\"send_message\" is not a known member of \"None\"",
+	"source": "Pylance",
+	"startLineNumber": 27,
+	"startColumn": 17,
+	"endLineNumber": 27,
+	"endColumn": 29
+},{
+	"resource": "/home/ekusiadadus/dev/minyoo/minyoo/src/web/handlers/chat_handler.py",
+	"owner": "_generated_diagnostic_collection_name_#6",
+	"code": {
+		"value": "reportGeneralTypeIssues",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pyright/blob/main/docs/configuration.md",
+			"scheme": "https",
+			"authority": "github.com",
+			"fragment": "reportGeneralTypeIssues"
+		}
+	},
+	"severity": 8,
+	"message": "Argument of type \"str | None\" cannot be assigned to parameter \"bot_id\" of type \"str\" in function \"send_message\"\n  Type \"str | None\" cannot be assigned to type \"str\"\n    Type \"None\" cannot be assigned to type \"str\"",
+	"source": "Pylance",
+	"startLineNumber": 27,
+	"startColumn": 37,
+	"endLineNumber": 27,
+	"endColumn": 48
+}]
+```
+
+
+WebSocket通信部分をCallbackで呼ぼうとすると、上のようなエラーが置きます。
+コードをどのように修正すればいいですか?
+
+answer: エラーは主に2つに分けられます：
+
+1. `Result of async function call is not used; use "await" or assign result to variable`
+
+2. `"send_message" is not a known member of "None"` and `Argument of type "str | None" cannot be assigned to parameter "bot_id" of type "str" in function "send_message"`
+
+それぞれの問題の解決方法は以下のとおりです。
+
+### 問題1: `Result of async function call is not used; use "await" or assign result to variable`
+
+このエラーは、`on_llm_new_token`メソッド内で`send_message()`を呼び出している際に、その戻り値（つまり`async function`の`await`）が使われていないことに関連しています。この問題を解決するために、`send_message()`メソッドの呼び出しを`await`で変更しましょう。
+
+ただし、これを行うためには`on_llm_new_token`メソッドを`async def`で定義する必要があります。
+
+`on_llm_new_token`メソッドを以下のように変更してください：
+
+```python
+async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+    """新しいtokenが来たらprintする"""
+    print("\033[36m" + token + "\033[0m")
+    await self.ws.send_message(token, self.bot_id)
+```
+
+### 問題2: `"send_message" is not a known member of "None"` および `Argument of type "str | None" cannot be assigned to parameter "bot_id" of type "str" in function "send_message"`
+
+これらのエラーは、`MyCustomCallbackHandler` クラスの `__init__` メソッドで、`ws` と `bot_id` に `Optional` 型を使用しているために発生しています。これらのエラーを回避するために、`__init__` メソッドでデフォルト値を設定し、型アノテーションを変更してください。
+
+以下のように `MyCustomCallbackHandler` クラスの `__init__` メソッドを更新してください：
+
+```python
+class MyCustomCallbackHandler(BaseCallbackHandler):
+    def __init__(self, bot_id: str = '', ws: ConnectionManager = ConnectionManager()) -> None:
+        super().__init__()
+        self.ws = ws
+        self.bot_id = bot_id
+```
+
+これらの変更により、コードで表示されるエラーは解決されるはずです。
+
+
+/home/ekusiadadus/dev/minyoo/minyoo/.venv/lib/python3.11/site-packages/langchain/callbacks/manager.py:139: RuntimeWarning: coroutine 'MyCustomCallbackHandler.on_llm_new_token' was never awaited
+  getattr(handler, event_name)(*args, **kwargs)
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+
+上のようなエラーがでて、コールバックが呼ばれません。
+どのように修正すればいいですか？
+answer: `on_llm_new_token`がasync関数になったため、`langchain/callbacks/manager.py`でイベントハンドラを呼び出している部分を変更する必要があります。このようなWarningが発生します： `'coroutine 'MyCustomCallbackHandler.on_llm_new_token' was never awaited`
+
+イベントの呼び出し部分は、おそらく、以下のようなコードになっているでしょう： 
+
+```python
+getattr(handler, event_name)(*args, **kwargs)
+```
+
+このコードでは、async関数の結果（コルーチン）がawaitされていないためWarningが発生します。この問題を解決するためには、イベントハンドラの呼び出しを`await`するか、`asyncio.create_task()`を使用して新しいタスクを作成して実行する必要があります。
+
+もし`langchain/callbacks/manager.py`がすでにasyncコンテキスト内にある場合、以下のように修正できます：
+
+```python
+await getattr(handler, event_name)(*args, **kwargs)
+```
+
+しかし、非同期コンテキストがない場合、`asyncio`ライブラリを使用して新しいタスクを作成して実行することができます：
+
+```python
+import asyncio
+
+asyncio.create_task(getattr(handler, event_name)(*args, **kwargs))
+```
+
+この変更により、コルーチンが適切に実行され、エラーが解決されるはずです。ただし、他のコールバックハンドラも同様にasync対応が必要である場合がありますので、注意が必要です。

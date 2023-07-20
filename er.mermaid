@@ -1,0 +1,252 @@
+erDiagram
+
+  users {
+    id bigint PK
+    email string
+    password string
+    full_name string
+    telephone string
+    company string
+    real_estate_license_number string
+    designation string
+    department string
+    profile string
+    career_achievements string
+    proud_fields user_proud_fields(user_id)
+    strong_area user_strong_areas(user_id)
+    price_start number
+    price_end number
+    storage_file_id storage_files
+    admin boolean
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+    is_active boolean
+    is_email_verified boolean
+    is_profile_created boolean
+    current_login_mode string
+    user_roles user_roles(user_id)
+  }
+
+  user_strong_areas {
+    id string PK
+    user_id number
+    prefecture_id number
+    municipality_id number
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  user_proud_fields {
+    id string PK
+    user_id number
+    proud_field_id number
+  }
+
+  auth_emails {
+    id string PK
+    email string
+    random_code string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+    expires_at timestamp
+  }
+
+  properties {
+    id string PK
+    user_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  buildings {
+    id string PK
+    propertie_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  lands {
+    id string PK
+    propertie_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  rooms {
+    id string PK
+    propertie_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  building_assessments {
+    id string PK
+    propertie_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  land_assessments {
+    id string PK
+    land_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  room_assessments {
+    id string PK
+    room_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  building_simulations {
+    id string PK
+    propertie_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  land_simulations {
+    id string PK
+    land_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  room_simulations {
+    id string PK
+    room_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  land_digestion_volumes {
+    id string PK
+    land_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  property_similars {
+    id string PK
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  labels {
+    id string PK
+    name string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+    created_by_id number
+    updated_by_id number
+  }
+
+  buyers {
+    id string PK
+    user_id string
+    email string
+    full_name string
+    telephone string
+    company string
+    department string
+    designation string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  buyer_labels {
+    id string PK
+    buyer_id string
+    label_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+    created_by_id number
+    updated_by_id number
+  }
+
+  buyer_needs {
+    id string PK
+    user_id string
+    title string
+    detail string
+    by_property string
+    area string
+    price string
+    surface_yield string
+    age string
+    along_the_line string
+    frequently_walked_to_the_nearest_station integer
+    structure string[]
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  buyer_needs_station {
+    id string PK
+    buyer_need_id string
+    route string
+    station string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  emails {
+    id string PK
+    subject string
+    text string
+    property_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  histories {
+    id string PK
+    email_id string
+    sending_destination_email_address string
+    or_not boolean
+    openings boolean
+    intention_to_purchase boolean
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  access_users {
+    id string PK
+    email_id string
+    seller_user_id string
+    buyer_user_id string
+    properties_id string
+    open_flg boolean
+    view_flg boolean
+    intent_flg boolean
+    price string
+    comment string
+    intended_created_at timestamp
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }

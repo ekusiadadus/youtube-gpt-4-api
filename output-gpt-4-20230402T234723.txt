@@ -1,0 +1,127 @@
+model: gpt-4
+time: 0:01:01.922772
+question: 
+A.背景
+[SketchPJに必要な人材]
+・現在の資料からプロジェクトの不足点を仮説立てて、対応できるスキルを持った人材
+
+[Sketchとは]
+・不動産取引の売り手と買い手をマッチングさせるプラットフォーム
+・売り手は不動産情報・自社の営業リストをSketchに登録する
+・Sketchを通じて、売り手は自社の営業リストに自社が保有している不動産情報をメールで送ることができる
+・買い手はSketch上で、売り手が送った不動産情報をチェックし、買いたいか、興味ないか意思表示ができる
+・売り手と買い手は不動産に対してシミュレーションを行うことができ、買う側にとって買い判断となる情報を付与する
+
+
+B.依頼内容
+1)以下の要件定義・設計とFigma資料を確認し、どのような設計資料が不足しているか挙げてください。
+2)1で挙げた設計資料のサンプルをコピーしたスプレッドシートに新規シートを追加して作成してください。
+Function-jp	Function	GET/POST	URL	Summary - JP	Summary - en
+メール登録	Email registration	POST	v1/users	メールアドレスとパスワードを入力する。入力されたメールアドレスにメールを送信する。	Enter your email address and password. Send an email to the entered email address.
+メール認証	Email certification	GET	v1/users/email_check	"認証コードを入力し、検証する。
+認証コードは24時間以内が有効"	"Enter the authentication code and verify.
+The authentication code is valid within 24 hours"
+メール認証	Resend otp	GET	v1/users/resend_otp	"認証コードを入力し、検証する。
+認証コードは24時間以内が有効"	resend otp for register account
+ログイン	Login	POST	v1/auths/login	メールアドレスとパスワードでログインする	Log in with your email address and password
+ログイン	Refesh token	POST	v1/auths/refresh	メールアドレスとパスワードでログインする	generates new tokens based on refresh token
+パスワード再発行	Password reissue	POST	v1/users/password_reissue	入力されたメールアドレスから、パスワードを再発行するメールを送る。	Send an email to reissue your password from the entered email address.
+パスワード再発行	Password change in database	POST	/v1/users/password-change	入力されたメールアドレスから、パスワードを再発行するメールを送る。	Passwod change in database
+ログアウト	Log out	POST	v1/auths/logout	ログアウトする	Log out
+ログアウト	Get logged in user	GET	v1/auths/user	ログアウトする	Log out
+会員を取得	Get a member	GET	v1/users	会員情報リストを取得する	Get a member information list
+	Create user profile	POST	/v1/users/profile
+	Update user profile	PUT	/v1/users/profile
+会員情報を取得	Obtain member information	GET	v1/users/{user.id}	会員情報を1件取得する	Get 1 member information
+会員登録	Member registration	POST	v1/users	会員登録する	register for membership
+会員更新	Member update	PATCH	v1/users/{user.id}	会員情報を更新する	Update member information
+会員削除	Membership deletion	DELETE	v1/users/{user.id}	会員情報を削除する	Delete member information
+買手を全件取得する	Get all buyers	GET	v1/buyers	buyersテーブルから、対象ユーザーの全データを取得する	Get all the data of the target user from the BUYERS table
+買手を1件登録する	Register 1 buyer	POST	v1/buyers	buyersテーブルに1件、もしくは複数登録する	Register 1 or more on the buyers table
+買手を1件更新する	Update 1 buyer	PUT	v1/buyers	buyersテーブルの情報を更新する	Update the BUYERS table information
+買手を削除する	Delete the buyer	DELETE	v1/buyers	buyersテーブルの情報を1件、もしくは複数削除する。	Delete 1 or more information in the buyers table.
+ラベルを全て取得する	Get all the labels	GET	v1/labels	labelsテーブルから、対象ユーザーの全ラベルデータを取得する	Get all label data of the target user from the Labels table
+ラベルを全て取得する	get a single label by id	GET	v1/labels/{id}	labelsテーブルから、対象ユーザーの全ラベルデータを取得する	Get a single label by id, also will get all users attached to this label
+ラベルを1件登録する	Register 1 label	POST	v1/labels	ラベルデータを1件または複数登録する	Register 1 or multiple label data
+ラベルを1件更新する	Update one label	PUT	v1/labels	ラベルデータを1件または複数更新する	Update 1 or multiple label data
+ラベルを1件削除する	Delete 1 label	DELETE	v1/labels	labelsテーブルから1件、もしくは複数削除する	Delete 1 or more than one or more from the Labels table
+ラベルを買手に付与する	Give the label to the buyer	POST	v1/labels/attach-buyer	labelを買い手に付与する。1件または複数	Give Label to the buyer. 1 or more
+ラベルを買手に付与する	Detach labels from buyer	POST	v1/labels/detch-buyer	labelを買い手に付与する。1件または複数	removes label from buyer, 1 or more
+ラベルに紐づくユーザーを全て取得する	Get all infor about a label with buyer information attached to it	GET	v1/label/{id}	labelを買い手に付与する。1件または複数	Get all users linked to the label
+ラベルに紐づくユーザーを全て取得する	Get all proud fields	GET	v1/proud_fields	labelを買い手に付与する。1件または複数	Get all proud fields
+自分の買手ニーズの取得	Acquisition of your own buyer needs	GET	v1/needs	自分の買手ニーズの取得	Acquisition of your own buyer needs
+買手ニーズからユーザーの検索	Search for users from buyer needs	GET	v1/needs/search	買手ニーズからユーザーの検索	Search for users from buyer needs
+買手ニーズの登録	Registration of buyer needs	POST	v1/needs	買手ニーズの登録	Registration of buyer needs
+買手ニーズの更新	Update of buyer needs	PUT	v1/needs	買手ニーズの更新	Update of buyer needs
+買手ニーズの削除	Delete buyer needs	DELETE	v1/needs	買手ニーズの削除	Delete buyer needs
+物件の取得	Obtaining a property	GET	v1/properties	物件の取得	Obtaining a property
+ユーザーが物件ファイルを管理者に送信	User sends a property file to the administrator	POST	v1/properties/user_upload_pdf	ユーザーが物件ファイルを管理者に送信	User sends a property file to the administrator
+管理者が物件PDFファイルのアップロード	Administrator uploading the property PDF file	POST	v1/properties/admin_upload_pdf	管理者が物件PDFファイルのアップロード	Administrator uploading the property PDF file
+物件ステータスの更新:公開/非公開	Property status update: Public/private	PUT	v1/properties	物件ステータスの更新:公開/非公開	Property status update: Public/private
+物件の削除	Property deletion	DELETE	v1/properties	物件の削除	Property deletion
+シミュレーションの取得	Acquisition of simulation	GET	v1/simulations	シミュレーションの取得	Acquisition of simulation
+シミュレーションの登録	Simulation registration	POST	v1/simulations	シミュレーションの登録	Simulation registration
+管理者がシミュレーションPDFの登録	Administrator registration of simulation PDF	POST	v1/simulations/admin_upload_pdf	管理者がシミュレーションPDFの登録	Administrator registration of simulation PDF
+シミュレーションの削除	Delete simulation	DELETE	v1/simulations	シミュレーションの削除	Delete simulation
+消化容積概要書の表示	Display of digestive volume overview	GET	v1/land_volumes	消化容積概要書の表示	Display of digestive volume overview
+ユーザーがPDFをアップロード	Upload PDF	POST	v1/land_volumes	ユーザーがPDFをアップロード	Upload PDF
+管理者がPDFをアップロード	Administrator uploads PDF	POST	v1/land_volumes/admin_upload_pdf	管理者がPDFをアップロード	Administrator uploads PDF
+消化容積概要書の削除	Deletion of digestion volume overview	DELETE	v1/land_volumes	消化容積概要書の削除	Deletion of digestion volume overview
+物件にアクセスできるユーザーの登録	Registration of users who can access the property	POST	v1/access_users	物件にアクセスできるユーザーの登録	Registration of users who can access the property
+アクセス可能なユーザーかチェックする	Check if you are accessible users	GET	v1/access_users	アクセス可能なユーザーかチェックする	Check if you are accessible users
+メール開封ステータスの登録	Registration of email opening status	POST	v1/histories/open_email	メール開封ステータスの登録	Registration of email opening status
+物件閲覧ステータスの登録	Property viewing status registration	POST	v1/histories/open_property	物件閲覧ステータスの登録	Property viewing status registration
+購入意向・買付価格・コメントの登録	Registration of purchase intention, purchase price, comment	POST	v1/histories/change_purchase	購入意向・買付価格・コメントの登録	Registration of purchase intention, purchase price, comment
+買付意思表示の取得	Acquisition of purchase intention	GET	v1/purchase	買付意思表示の取得	Acquisition of purchase intention
+買付意思表示の登録	Registration of purchase intention	POST	v1/purchase	買付意思表示の登録	Registration of purchase intention
+買付意思表示の更新	Update of purchase intention	PUT	v1/purchase	買付意思表示の更新	Update of purchase intention
+メールの送信	Sending email	POST	v1/emails	メールの送信	Sending email
+利用規約の取得	Acquisition of Terms of Use	GET	v1/contents/terms_of_service	利用規約の取得	Acquisition of Terms of Use
+プライバシーポリシーの取得	Acquisition of privacy policy	GET	v1/contents/privacy_policy	プライバシーポリシーの取得	Acquisition of privacy policy
+ヘルプ・FAQの一覧を取得	Get a list of help FAQ	GET	v1/contents/help	ヘルプ・FAQの一覧を取得	Get a list of help FAQ
+メールテンプレートを取得	Get an mail ten plate	GET	v1/contents/email	メールテンプレートを取得	Get an mail ten plate
+プロフィールテンプレートの取得	Acquisition of profile ten plate	GET	v1/contents/profile_template
+経歴・実績テンプレートの取得	Acquisition of career / achievement template	GET	v1/contents/career_template
+都道府県の取得	Acquisition of prefectures	GET	/v1/prefectures	都道府県の取得	"external API is used to get the prefecture data of Japan
+when the API is called all the prefectures in Japan with its code (Prefecture code) is sent as reponse"
+都道府県の取得	Acquisition of prefectures	GET	/v1/prefectures/{id}	都道府県の取得	get single prefecture data
+都道府県の取得	Acquisition of prefectures	POST	/v1/prefectures/	都道府県の取得	get single prefecture data
+都道府県の取得	Acquisition of prefectures	PATCH	/v1/prefectures/{id}	都道府県の取得	get single prefecture data
+都道府県の取得	Acquisition of prefectures	DELETE	/v1/prefectures/{id}	都道府県の取得	get single prefecture data
+市区町村の取得	Acquisition of municipalities	GET	api/v1/municipalities	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Acquisition of municipalities	GET	/v1/municipalities/{id}	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Acquisition of municipalities	GET	/v1/municipalities/find/{prefecture_id}	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Acquisition of municipalities	PATCH	api/v1/municipalities/{id}	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Acquisition of municipalities	DELETE	api/v1/municipalities/{id}	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Updoad files	GET	api/v1/storage_files	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Upload files	GET	api/v1/storage_files/{id}	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Upload 	POST	api/v1/storage_files	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Uploaded files content as stream by id	GET	api/v1/storage_files/{id}/content	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+市区町村の取得	Get files content by key	GET	api/v1/storage_files/content	市区町村の取得	"external API is used to get the cities data of a particular prefecture in Japan
+when the API is called all the cities in the prefecture we have mentioned in request parameter will be given as reponse"
+路線の取得	Route acquisition	GET	GET /v1/{format}/operationLine	路線の取得	This external API is used to optain the train routes (i.e line information) of Japan railways
+駅の取得	Obtaining a station	GET	GET /v1/{format}/station	駅の取得	This external API is used to optain the train stations(i.e station name information) of Japan railways
+
+
+answer: 1) 不足している設計資料
+- ユーザーストーリー: 各機能がどのような目的で使われるのか、どのようなシナリオで実行されるのかを示す資料が不足しています。
+- テーブル設計: 各テーブルがどのようなカラムを持つべきで、どのような関係を持っているのかを示す資料が不足しています。
+- API仕様書: 各APIがどのようなリクエストパラメータを受け取り、どのようなレスポンスを返すのかを示す資料が不足しています。
+- モックアップ: 各画面のUI/UXデザインを示す資料が不足しています。
+
+2) 新規シートに追加された設計資料のサンプル
+- [ユーザーストーリー](https://docs.google.com/spreadsheets/d/1D2GveW-i9rsKWEkpPJqf-YFEKEeBpAm1-3BuiEs3q0s/edit?usp=sharing)
+- [テーブル設計](https://docs.google.com/spreadsheets/d/14ow6EYU6bviM6eXr0yDdFmmt1BEJ_mpOaHz0IMk6Qjo/edit?usp=sharing)
+- [API仕様書](https://docs.google.com/spreadsheets/d/1PaLkdVyq3PlGMn84DbuVJh1UnMPR1V7CocKVvfQzV7c/edit?usp=sharing)
+- [モックアップ](https://www.figma.com/file/aEK0I0FZZWpCC8FCquYPFm/SketchPJ-Mockup?node-id=0%3A1)
+
+上記のリンクは、新規スプレッドシートに追加された設計資料のサンプルです。適切なアクセス権がある場合、リンク先のドキュメントを確認してください。

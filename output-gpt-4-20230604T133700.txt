@@ -1,0 +1,123 @@
+model: gpt-4
+time: 0:00:49.935886
+question: import hashlib
+import uuid
+from dataclasses import dataclass
+
+
+@dataclass
+class UserId:
+    id: str
+
+
+@dataclass
+class UserName:
+    name: str
+
+
+@dataclass
+class UserEmail:
+    email: str
+
+
+@dataclass
+class UserPassword:
+    password: str
+
+
+@dataclass
+class User:
+    id: UserId
+    name: UserName
+    email: UserEmail
+    password: UserPassword
+
+    def __init__(self, id: UserId, name: UserName, email: UserEmail, password: UserPassword):
+        self.id = id
+        self.name = name
+        self.email = email
+        self.password = password
+
+    @staticmethod
+    def new(name: str, email: str, password: str):
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        return User(
+            id=UserId(str(uuid.uuid4())),
+            name=UserName(name),
+            email=UserEmail(email),
+            password=UserPassword(hashed_password),
+        )
+
+    def check_password(self, password: str):
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        return self.password.password == hashed_password
+
+    def to_dict(self):
+        return {
+            "id": self.id.id,
+            "name": self.name.name,
+            "email": self.email.email,
+            "password": self.password.password,
+        }
+
+
+User(id=UserId(id='10929ed9-6603-409c-ab67-e6dcbbc595ab'), name=UserName(name='string'), email=UserEmail(email='user@example.com'), password=UserPassword(password='473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8'))
+UserEmail(email='user@example.com')
+
+上のような形式になってしまい、
+
+^
+  File "pydantic/main.py", line 341, in pydantic.main.BaseModel.__init__
+pydantic.error_wrappers.ValidationError: 1 validation error for FindByEmailOutput
+email
+  value is not a valid email address (type=value_error.email)
+
+というエラーが出てしまいます。
+修正してください。
+answer: 解決するには、`UserEmail`や他のcusomtタイプを使用せず、`User`クラスに直接文字列を渡すことができます。例えば、`UserName('string')`の代わりに`'string'`を渡します。
+
+こちらが修正されたコードです。
+
+```python
+import hashlib
+import uuid
+from dataclasses import dataclass
+
+
+@dataclass
+class User:
+    id: str
+    name: str
+    email: str
+    password: str
+
+    def __init__(self, id: str, name: str, email: str, password: str):
+        self.id = id
+        self.name = name
+        self.email = email
+        self.password = password
+
+    @staticmethod
+    def new(name: str, email: str, password: str):
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        return User(
+            id=str(uuid.uuid4()),
+            name=name,
+            email=email,
+            password=hashed_password,
+        )
+
+    def check_password(self, password: str):
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        return self.password == hashed_password
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "password": self.password,
+        }
+```
+
+これにより、`User`クラスは平坦なデータ構造になり、`UserEmail`などのカスタムタイプを使用せずに直接文字列を使用します。これでPydanticのフォーマットと親和性が高くなり、エラーが解決されるはずです。

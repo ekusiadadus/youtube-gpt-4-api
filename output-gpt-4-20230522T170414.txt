@@ -1,0 +1,218 @@
+model: gpt-4
+time: 0:01:20.768847
+question:     connection_id: str,	        connection_id: str,
+        domain_name: str,	        domain_name: str,
+        stage: str,	        stage: str,
+        referred_docs: list,
+        splitter=None,	        splitter=None,
+    ) -> None:	    ) -> None:
+        super().__init__()	        super().__init__()
+        self.connection_id = connection_id	        self.connection_id = connection_id
+        self.domain_name = domain_name	        self.domain_name = domain_name
+        self.stage = stage	        self.stage = stage
+        self.referred_docs = referred_docs
+        self.client = boto3.client(	        self.client = boto3.client(
+            "apigatewaymanagementapi", endpoint_url=f"https://{domain_name}/{stage}"	            "apigatewaymanagementapi", endpoint_url=f"https://{domain_name}/{stage}"
+        )	        )
+@@ -101,10 +103,16 @@ def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+            token = self.splitter.apply_stream(token)	            token = self.splitter.apply_stream(token)
+            if token == "":	            if token == "":
+                return	                return
+        self.client.post_to_connection(Data=token, ConnectionId=self.connection_id)	        data = json.dumps({"type": "msg", "message": token})
+        self.client.post_to_connection(Data=data, ConnectionId=self.connection_id)
+
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:	    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Run when LLM ends running."""	        """Run when LLM ends running."""
+        data = json.dumps({
+            "type": "end",
+            "documents": self.referred_docs
+        })
+        self.client.post_to_connection(Data=self.end_message, ConnectionId=self.connection_id)
+@ekusiadadus ekusiadadus 6 minutes ago
+これで切れてしまっている？
+
+@ekusiadadus	Reply...
+        self.client.close()	        self.client.close()
+        self.client.delete_connection(ConnectionId=self.connection_id)	        self.client.delete_connection(ConnectionId=self.connection_id)
+
+
+@@ -157,13 +165,15 @@ def get_websocket_callback_manager(
+    connection_id: str,	    connection_id: str,
+    domain_name: str,	    domain_name: str,
+    stage: str,	    stage: str,
+    referred_docs: list,
+    splitter=None,	    splitter=None,
+):	):
+    """Callback manager with its own handler for AWS Websocket API."""	    """Callback manager with its own handler for AWS Websocket API."""
+    cbHandler = WebsocketCallbackHandler(	    cbHandler = WebsocketCallbackHandler(
+        connection_id=connection_id,	        connection_id=connection_id,
+        domain_name=domain_name,	        domain_name=domain_name,
+        stage=stage,	        stage=stage,
+        referred_docs=referred_docs,
+        splitter=splitter,	        splitter=splitter,
+    )	    )
+    return CallbackManager([cbHandler])	    return CallbackManager([cbHandler])
+@@ -346,36 +356,11 @@ def post_handler(event, bot_id: str, request_body: dict):
+        # annotations = build_annotation_string(annotations_pairs)	        # annotations = build_annotation_string(annotations_pairs)
+        # logger.info(annotations)	        # logger.info(annotations)
+
+
+        # prepare callback handler to websocket
+        callback_manager = get_websocket_callback_manager(
+            connection_id=connectionId,
+            domain_name=domain_name,
+            stage=stage,
+            splitter=Splitter(
+                prompt_config["PromptSettings"]["UserPrompt"]["Splitter"]
+            ),
+        )
+
+
+        # LLMモデルを設定	        # LLMモデルを設定
+        llm_model = "openai"  # Azureを利用できるようになった場合は、ここを動的に変更	        llm_model = "openai"  # Azureを利用できるようになった場合は、ここを動的に変更
+        model_name = "gpt-3.5-turbo"  # 将来、ここも動的に変更	        model_name = "gpt-3.5-turbo"  # 将来、ここも動的に変更
+
+
+        llm_without_streaming = build_llm_model(
+            api_key=api_key,
+            model_name=model_name,
+            need_streaming=False,
+            verbose=True,
+            llm_model=llm_model,
+        )
+        llm_with_streaming = build_llm_model(
+            api_key=api_key,
+            model_name=model_name,
+            need_streaming=True,
+            verbose=True,
+            callback_manager=callback_manager,
+            llm_model=llm_model,
+        )
+
+        # Define tokenizer	        # Define tokenizer
+        # tokenizer = tiktoken.encoding_for_model(model_name)	        # tokenizer = tiktoken.encoding_for_model(model_name)
+        if model_name == "gpt-3.5-turbo":	        if model_name == "gpt-3.5-turbo":
+@@ -397,6 +382,15 @@ def post_handler(event, bot_id: str, request_body: dict):
+        num_tokens = None	        num_tokens = None
+        trial_prompt = None	        trial_prompt = None
+
+
+        # 質問生成 chain を作成
+        llm_without_streaming = build_llm_model(
+            api_key=api_key,
+            model_name=model_name,
+            need_streaming=False,
+            verbose=True,
+            llm_model=llm_model,
+        )
+
+        if len(chat_history) >= 2:	        if len(chat_history) >= 2:
+            chain_condense_question = LLMChain(	            chain_condense_question = LLMChain(
+                llm=llm_without_streaming,	                llm=llm_without_streaming,
+@@ -466,11 +460,11 @@ def post_handler(event, bot_id: str, request_body: dict):
+        #    f"annotation#{di['resource_id']}"	        #    f"annotation#{di['resource_id']}"
+        #    for di in list(	        #    for di in list(
+        #        filter(	        #        filter(
+        #            lambda item: item.get("resource_type") == "annotation", references	        #            lambda item: item.get("resource_type") == "annotation", references  # noqa
+        #        )	        #        )
+        #    )	        #    )
+        # ]	        # ]
+        docs_meta = resource_meta_repository.search_documents(	        searched_docs_meta = resource_meta_repository.search_documents(
+            company_id,	            company_id,
+            condensed_question,	            condensed_question,
+            docs_refs,	            docs_refs,
+@@ -479,8 +473,8 @@ def post_handler(event, bot_id: str, request_body: dict):
+        # 最大token数上限を超えないように選定	        # 最大token数上限を超えないように選定
+        facts = ""	        facts = ""
+        num_tokens = None	        num_tokens = None
+        for docs_count in range(len(docs_meta), -1, -1):	        for docs_count in range(len(searched_docs_meta), -1, -1):
+            trial_facts = build_facts_string(docs_meta[:docs_count])	            trial_facts = build_facts_string(searched_docs_meta[:docs_count])
+            trial_prompt = qa_prompt_with_character.format(	            trial_prompt = qa_prompt_with_character.format(
+                context=trial_facts,	                context=trial_facts,
+                question=condensed_question,	                question=condensed_question,
+@@ -500,12 +494,38 @@ def post_handler(event, bot_id: str, request_body: dict):
+            + f" # num_tokens: {num_tokens}\n"	            + f" # num_tokens: {num_tokens}\n"
+            + f" # docs_count: {docs_count}\n\n"	            + f" # docs_count: {docs_count}\n\n"
+            + f" # docs_refs:\n{docs_refs}\n\n"	            + f" # docs_refs:\n{docs_refs}\n\n"
+            + f" # docs_meta:\n{docs_meta}\n\n"	            + f" # searched_docs_meta:\n{searched_docs_meta}\n\n"
+            + f" # facts:\n{facts}\n\n"	            + f" # facts:\n{facts}\n\n"
+        )	        )
+
+
+        ###############################################	        ###############################################
+        # Step3: QAを実施する。	        # Step3: QAを実施する。
+
+        # 参照した Document のリストを作成
+        referred_docs = [
+            {"resource_id": doc.resource_id, "resource_name": doc.resource_name, "resource_url": doc.resource_url}
+            for doc in searched_docs_meta
+        ]
+        # websocket用の callback handler を生成
+        callback_manager = get_websocket_callback_manager(
+            connection_id=connectionId,
+            domain_name=domain_name,
+            stage=stage,
+            referred_docs=referred_docs,
+            splitter=Splitter(
+                prompt_config["PromptSettings"]["UserPrompt"]["Splitter"]
+            ),
+        )
+        # QA回答をする chain を作成
+        llm_with_streaming = build_llm_model(
+            api_key=api_key,
+            model_name=model_name,
+            need_streaming=True,
+            verbose=True,
+            callback_manager=callback_manager,
+            llm_model=llm_model,
+        )
+
+        chain_factorial_qa_with_character = LLMChain(	        chain_factorial_qa_with_character = LLMChain(
+            llm=llm_with_streaming,	            llm=llm_with_streaming,
+            prompt=qa_prompt_with_character,	            prompt=qa_prompt_with_character,
+@@ -665,9 +685,9 @@ def convert_chat_history(chat_history: list[dict]):
+    return output[:-1]  # 最後の'\n'を削除	    return output[:-1]  # 最後の'\n'を削除
+
+
+
+
+def build_facts_string(docs_meta: list):	def build_facts_string(searched_docs_meta: list):
+    facts = ""	    facts = ""
+    for doc in docs_meta:	    for doc in searched_docs_meta:
+        facts += "Reference Name: " + doc.resource_name + "  "	        facts += "Reference Name: " + doc.resource_name + "  "
+        if doc.resource_url:	        if doc.resource_url:
+            facts += "Reference URL: " + doc.resource_url + "  "	            facts += "Reference URL: " + doc.resource_url + "  "
+
+
+上のコードの差分で、2回目以降メッセージが送れなくなっています。どのように修正すればいいですか？
+answer: 下記の手順で問題が解決しないか確認してみてください。
+
+1. `llm_with_streaming` を定義する前に `callback_manager` を設定していますが、2回目以降のリクエストの際にも`callback_manager` を再設定するようにしましょう。以下のコードを `post_handler` 関数内の適切な場所に移動させてください。
+
+```python
+callback_manager = get_websocket_callback_manager(
+    connection_id=connectionId,
+    domain_name=domain_name,
+    stage=stage,
+    referred_docs=referred_docs,
+    splitter=Splitter(
+        prompt_config["PromptSettings"]["UserPrompt"]["Splitter"]
+    ),
+)
+```
+
+2. 必要に応じて、`llm_with_streaming` を再定義します。以下のコードを修正した `callback_manager` の設定の後に移動してください。
+
+```python
+llm_with_streaming = build_llm_model(
+    api_key=api_key,
+    model_name=model_name,
+    need_streaming=True,
+    verbose=True,
+    callback_manager=callback_manager,
+    llm_model=llm_model,
+)
+```
+
+これらの変更によって、各リクエストに対して新しい `callback_manager` が設定され、2回目以降のメッセージも正しく送信されるはずです。コードを修正し、問題が解決するかどうかを確認してみてください。

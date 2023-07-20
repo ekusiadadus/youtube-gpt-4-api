@@ -1,0 +1,44 @@
+model: gpt-4
+time: 0:01:13.664096
+question: 
+<script
+  id="test"
+  type="text/javascript"
+  async
+  src="https://ekusiadadus.github.io/vite-project/button-id.umd.cjs"
+></script>
+<script type="text/javascript">
+  const script = document.getElementById("test")
+  script.addEventListener("load", () => {
+    globalThis.run({ id: "ここにBOT_IDを埋め込む" })
+  })
+</script>
+
+上のスクリプトでは、elementが読み込まれた時に、globalThis.run({ id: "ここにBOT_IDを埋め込む" })を実行しています。
+しかし、elementが作成される前に、globalThis.run({ id: "ここにBOT_IDを埋め込む" })が実行されてしまうことがあります。
+そのため、elementが作成されるた後に、globalThis.run({ id: "ここにBOT_IDを埋め込む" })を実行するようにしたいです。
+
+answer: 以下のスクリプトは、要素が作成されるのを確認してから `globalThis.run({ id: "ここにBOT_IDを埋め込む" })` を実行するように変更しています。
+
+```html
+<script
+  id="test"
+  type="text/javascript"
+  async
+  src="https://ekusiadadus.github.io/vite-project/button-id.umd.cjs"
+></script>
+<script type="text/javascript">
+  const script = document.getElementById("test");
+
+  script.addEventListener("load", () => {
+    const checkElementExist = setInterval(() => {
+      if (document.querySelector("#your-element-selector")) { // ここに実際の要素セレクタを入れてください。
+        globalThis.run({ id: "ここにBOT_IDを埋め込む" }); // 要素が存在するときに実行
+        clearInterval(checkElementExist);
+      }
+    }, 100);
+  });
+</script>
+```
+
+`your-element-selector` の部分を、実際の要素セレクタ（class や id など）に置き換えてください。このコードは、ページ上の指定された要素の存在を定期的にチェックし、要素が作成されると `globalThis.run({ id: "ここにBOT_IDを埋め込む" })` を実行します。

@@ -1,0 +1,211 @@
+model: gpt-4
+time: 0:00:34.889368
+question: import { Message } from "../domain/model/message";
+import { Typography } from "matsuri-ui";
+import { css } from "../../styled-system/css";
+import React, { useEffect, useRef, useState } from "react";
+
+const CSChatPage = () => {
+  const [messageText, setMessageText] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const ws = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (ws.current === null || ws.current.readyState === WebSocket.CLOSED) {
+      ws.current = new WebSocket(
+        import.meta.env.VITE_VERCEL_ENV === "production"
+          ? "wss://api-gpt.dev.m2msystems.cloud" + `/cs/chat`
+          : "wss://api-gpt.dev.m2msystems.cloud" + `/cs/chat`
+      );
+
+      ws.current.onmessage = function (event) {
+        const messageData = JSON.parse(event.data);
+
+        setMessages((prevMessages) => {
+          const existingMessageIndex = prevMessages.findIndex(
+            (msg) => msg.id === messageData.id && msg.author_type === "bot"
+          );
+          if (existingMessageIndex > -1) {
+            const newMessages = [...prevMessages];
+            newMessages[existingMessageIndex] = {
+              ...newMessages[existingMessageIndex],
+              text:
+                newMessages[existingMessageIndex].text + messageData.message,
+            };
+            return newMessages;
+          } else {
+            return [
+              ...prevMessages,
+              {
+                id: messageData.id,
+                chat_id: messageData.chat_id,
+                author_type: "bot",
+                message_type: "default",
+                text: messageData.message,
+                bot_id: messageData.bot_id,
+              },
+            ];
+          }
+        });
+      };
+    }
+  });
+
+  const sendMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (ws.current !== null && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(messageText);
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: "temp",
+          chat_id: "tempChatId",
+          author_type: "user",
+          message_type: "default",
+          text: messageText,
+          user_id: "tempUserId",
+        },
+      ]);
+      setMessageText("");
+    }
+  };
+
+  return (
+    <div
+      className={css({
+        borderRadius: "15px",
+        backgroundColor: "#FFFFFF",
+        padding: "20px",
+        maxWidth: "600px",
+        margin: "0 auto",
+        boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+      })}
+    >
+      <h1>CS用Chat</h1>
+      <a
+        href="https://docs.google.com/spreadsheets/d/1yhgyGLIT_hDseRPshKCfnxeTPapmlLcA5Apr6tbU-6o/edit#gid=1281356584"
+        target="_blank"
+        rel="noreferrer"
+      >
+        スプレッドシート
+      </a>
+      <form onSubmit={sendMessage}>
+        <input
+          type="text"
+          value={messageText}
+          onChange={(e) => setMessageText(e.target.value)}
+          placeholder="Enter message"
+          required
+        />
+        <input type="submit" value="Send" />
+      </form>
+
+      <ul>
+        {messages.map((message) => (
+          <li
+            key={message.id}
+            className={css({
+              display: "flex",
+              justifyContent:
+                message.author_type === "bot" ? "flex-start" : "flex-end",
+              padding: "10px",
+              marginBottom: "10px",
+              borderRadius: "15px", // Round corners
+              backgroundColor:
+                message.author_type === "bot" ? "#f0f0f0" : "#e0f7fa",
+            })}
+          >
+            {message.author_type === "bot" && (
+              <img
+                src="/pptotoro.jpg"
+                alt="Bot"
+                style={{ width: "80%", maxWidth: "200px", maxHeight: "200px" }}
+              />
+            )}
+            {/* Adjust size */}
+            <Typography>
+              <budoux-ja>
+                {message.text.split("\n").map((line, index) => (
+                  <>
+                    <p key={index}>{line}</p>
+                    <br />
+                  </>
+                ))}
+              </budoux-ja>
+            </Typography>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default CSChatPage;
+
+
+ページ遷移等の操作があった場合は、WebSocketを閉じるように修正して
+
+answer: 処理を追加する必要があります。
+
+useEffect内に次のような処理を追加します。
+
+```jsx
+return () => {
+  if (ws.current) {
+    ws.current.close();
+  }
+};
+```
+
+これにより、コンポーネントがアンマウントされた時にWebSocketの接続が切断されます。
+
+修正後の全体のコードは次のようになります。
+
+```jsx
+useEffect(() => {
+  if (ws.current === null || ws.current.readyState === WebSocket.CLOSED) {
+    ws.current = new WebSocket(
+      import.meta.env.VITE_VERCEL_ENV === "production"
+        ? "wss://api-gpt.dev.m2msystems.cloud" + `/cs/chat`
+        : "wss://api-gpt.dev.m2msystems.cloud" + `/cs/chat`
+    );
+
+    ws.current.onmessage = function (event) {
+      const messageData = JSON.parse(event.data);
+
+      setMessages((prevMessages) => {
+        const existingMessageIndex = prevMessages.findIndex(
+          (msg) => msg.id === messageData.id && msg.author_type === "bot"
+        );
+        if (existingMessageIndex > -1) {
+          const newMessages = [...prevMessages];
+          newMessages[existingMessageIndex] = {
+            ...newMessages[existingMessageIndex],
+            text:
+              newMessages[existingMessageIndex].text + messageData.message,
+          };
+          return newMessages;
+        } else {
+          return [
+            ...prevMessages,
+            {
+              id: messageData.id,
+              chat_id: messageData.chat_id,
+              author_type: "bot",
+              message_type: "default",
+              text: messageData.message,
+              bot_id: messageData.bot_id,
+            },
+          ];
+        }
+      });
+    }
+  }
+
+  return () => {
+    if (ws.current) {
+      ws.current.close();
+    }
+  };
+});
+```

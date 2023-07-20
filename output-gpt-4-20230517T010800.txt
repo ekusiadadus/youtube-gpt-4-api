@@ -1,0 +1,465 @@
+model: gpt-4
+time: 0:02:32.078541
+question: 
+import {
+  FormControl,
+  TextField,
+  Button,
+  Container,
+  Typography,
+  Box,
+  Grid
+} from "@mui/material"
+import { useState } from "react"
+import { useParams } from "react-router-dom"
+import { useBot } from "../../../states"
+import { useAuth } from "../../../auth"
+import zIndex from "@mui/material/styles/zIndex"
+import { MyLocation } from "@mui/icons-material"
+
+export const Demo = () => {
+  const [inputText, setInputText] = useState<string>("")
+  const [chatTexts, setChatTexts] = useState<string[]>([])
+  const [isLadingText, setIsLadingText] = useState<boolean>(false)
+  const [isClickedSend, setIsClickedSend] = useState<boolean>(false)
+  const [color, setColor] = useState("#3366FF")
+  const [textColor, setTextColor] = useState("white")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+  const userID: string = auth.userID
+  const endpointURLBase: string = import.meta.env.VITE_WEBSOCKET_ENDPOINT
+  const endpointURL: string =
+    botID && companyID
+      ? endpointURLBase +
+        "?" +
+        "bot_id=" +
+        botID +
+        "&" +
+        "company_id=" +
+        companyID
+      : endpointURLBase
+
+  const botState = useBot()
+
+  const onClickSend = async () => {
+    if (isClickedSend) {
+      return
+    }
+    const chatTextsElement = document.getElementById("chat_texts")
+    setIsLadingText(true)
+    setIsClickedSend(true)
+    const text = inputText
+    const storeChatTexts = [...chatTexts, text]
+    setChatTexts(storeChatTexts)
+    setInputText("")
+
+    const connection = new WebSocket(endpointURL)
+
+    connection.onopen = function () {
+      connection.send(
+        JSON.stringify({
+          action: "sendmessage",
+          company_id: companyID,
+          user_id: userID,
+          bot_id: botID,
+          history: chatTexts.map((setChatText, index) => {
+            if (index % 2 === 0) {
+              return {
+                type: "human",
+                message: setChatText
+              }
+            } else {
+              return {
+                type: "ai",
+                message: setChatText
+              }
+            }
+          }),
+          user_input: text
+        })
+      )
+      chatTextsElement?.scrollTo(0, chatTextsElement.scrollHeight)
+    }
+
+    let responseText = ""
+
+    connection.onmessage = function (event) {
+      setIsLadingText(false)
+      const eventData: string = event.data.toString()
+      responseText += eventData.includes("Endpoint request timed out")
+        ? ""
+        : eventData
+      setChatTexts([...storeChatTexts, responseText])
+      chatTextsElement?.scrollTo(0, chatTextsElement.scrollHeight)
+    }
+
+    connection.onerror = function () {}
+
+    connection.onclose = function () {
+      setIsClickedSend(false)
+    }
+  }
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Box
+      component={"form"}
+      sx={{
+        m:4,
+        width:1250,
+
+      }}
+      >
+
+
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Grid container justifyContent="flex-end">
+          <Grid item xs={10}>
+            <Typography variant="h5">Demo</Typography>
+          </Grid>
+          <Grid item xs={2}>
+            <Button
+              sx={{ justifyContent: "right", left:"72px"}}
+              variant="contained"
+              onClick={() => {
+                !isClickedSend && setChatTexts([])
+              }}
+            >
+              Clear Chat
+            </Button>
+          </Grid>
+        </Grid>
+        <Grid container sx={{ width: 1 }}>
+          <Grid item xs={10}>
+            <Grid container>
+              <Grid item>
+                <Grid container>
+                  <Grid
+                    item
+                    xs={12}
+                    sx={{
+                      display: "flex",
+                      height: "20px",
+                      fontFamily: "Sanchez",
+                      fontStyle: "normal",
+                      fontWeight: "400",
+                      fontSize: "12px",
+                      lineHeight: "20px",
+                      color: "#767676"
+                    }}
+                  >
+                    {botState.bot?.resource_name}
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Grid>
+          </Grid>
+          <Grid item xs={2}>
+            <FormControl
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "flex-start",
+                padding: "0px",
+                gap: "8px",
+                position: "relative",
+                height: "24px"
+              }}
+            ></FormControl>
+          </Grid>
+        </Grid>
+        <div
+          id="chat_texts"
+          style={{
+            display: "flex",
+            width: 1250,
+            height: "calc(100vh - 300px)",
+            overflow: "scroll",
+
+          }}
+        >
+          <Container
+            style={{
+              width: 1250,
+              display: "flex",
+              flexDirection: "column",
+              marginBottom: "10px",
+            }}
+          >
+            {chatTexts.map((setChatText, index) => {
+              if (index % 2 === 0) {
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      display: "flex",
+                      justifyContent: "right",
+                      marginRight: "50px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        padding: "20px",
+                        gap: "10px",
+                        width: "280px",
+                        background: "#3583DA",
+                        borderRadius: "10px",
+                        boxShadow:
+                          "0px 2px 2px rgba(0, 0, 0, 0.14), 0px 3px 1px rgba(0, 0, 0, 0.12), 0px 1px 5px rgba(0, 0, 0, 0.2)"
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "250px",
+                          fontFamily: "Sanchez",
+                          fontStyle: "normal",
+                          fontWeight: "400",
+                          fontSize: "14px",
+                          lineHeight: "18px",
+                          textAlign: "left",
+                          letterSpacing: "0.05em",
+                          color: "#FFFFFF",
+                          flex: "none",
+                          order: 0,
+                          flexGrow: 0,
+                          overflowWrap: "break-word"
+                        }}
+                      >
+                        {setChatText}
+                      </div>
+                    </div>
+                  </div>
+                )
+              } else {
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      display: "flex",
+                      justifyContent: "left",
+                      marginLeft:"-45px"
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: "10px",
+                        width: "280px",
+                        background: "#FFFFFF",
+                        boxShadow:
+                          "0px 2px 2px rgba(0, 0, 0, 0.14), 0px 3px 1px rgba(0, 0, 0, 0.12), 0px 1px 5px rgba(0, 0, 0, 0.2)",
+                        borderRadius: "10px",
+                        padding: "20px"
+                      }}
+                    >
+                      <div
+                          style={{
+                          width: "250px",
+                          fontFamily: "Sanchez",
+                          fontStyle: "normal",
+                          fontWeight: "400",
+                          fontSize: "14px",
+                          lineHeight: "18px",
+                          textAlign: "left",
+                          letterSpacing: "0.05em",
+                          color: "#000000",
+                          flex: "none",
+                          order: 0,
+                          flexGrow: 0,
+                          overflowWrap: "break-word"
+                        }}
+                      >
+                        {setChatText}
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+            })}
+            {isLadingText && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "left"
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: "10px",
+                    width: "280px",
+                    background: "#FFFFFF",
+                    boxShadow:
+                      "0px 2px 2px rgba(0, 0, 0, 0.14), 0px 3px 1px rgba(0, 0, 0, 0.12), 0px 1px 5px rgba(0, 0, 0, 0.2)",
+                    borderRadius: "10px",
+                    padding: "20px"
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "250px",
+                      fontFamily: "Sanchez",
+                      fontStyle: "normal",
+                      fontWeight: "400",
+                      fontSize: "14px",
+                      lineHeight: "18px",
+                      textAlign: "left",
+                      letterSpacing: "0.05em",
+                      color: "#000000",
+                      flex: "none",
+                      order: 0,
+                      flexGrow: 0,
+                      overflowWrap: "break-word"
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center"
+                      }}
+                    >
+                      <div className="dot-elastic" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Container>
+        </div>
+        <Grid
+          sx={{
+            display: "flex",
+            flexDirection: "row",
+            width: "100%"
+          }}
+        >
+          <TextField
+            variant="outlined"
+            placeholder="Send  Message"
+            value={inputText}
+            onChange={e => {
+              setInputText(e.target.value)
+            }}
+            onKeyDown={e => {
+              if (e.keyCode === 13 && inputText && chatTexts.length % 2 === 0) {
+                void onClickSend()
+              }
+            }}
+            style={{
+              width: "calc(100% - 42px)"
+            }}
+          />
+          <Button
+            style={{ background: color, color: textColor }}
+            variant="contained"
+            onClick={() => {
+              setColor("#3366FF")
+              setTextColor("white")
+              if (inputText && chatTexts.length % 2 === 0) {
+                void onClickSend()
+              }
+            }}
+          >
+            Send
+          </Button>
+        </Grid>
+      </Container>
+     </Box>
+    </Box>
+  )
+}
+
+```
+
+
+1. 現状、Enterをおすとリロードされてしまい、送信ボタンをEnterで押せない
+2. レスポンシブ対応していない
+
+を修正してください。
+
+
+answer: 1. Enterを押すとリロードされてしまう問題を修正するには、formのonSubmitイベントをキャッチして、`event.preventDefault()` を実行する必要があります。これにより、デフォルトの送信動作（ページのリロード）が停止されます。
+
+以下のように修正します。
+
+```jsx
+...
+
+
+// onSubmitイベントハンドラを追加
+const onSubmit = (event: React.FormEvent) => {
+  event.preventDefault()
+  if (inputText && chatTexts.length % 2 === 0) {
+    void onClickSend()
+  }
+}
+
+return (
+  <Box
+    sx={{
+      display: "flex",
+      flexDirection: "column",
+    }}
+  >
+    <Box
+      component={"form"}
+      onSubmit={onSubmit} {/* ここにonSubmitイベントハンドラを追加 */}
+      sx={{
+        m: 4,
+        width: 1250,
+      }}
+    >
+      ...
+    </Box>
+  </Box>
+)
+```
+
+2. レスポンシブ対応に関しては、GridコンポーネントやContainerコンポーネントを使って、ブレークポイントごとに異なるスタイルが適用されるようにすることができます。
+
+例えば、以下のように修正してみてください。
+
+```jsx
+<Grid container justifyContent="flex-end">
+  <Grid item xs={12} sm={10}> {/* xs=12, sm=10 のようにブレークポイントごとのサイズを指定 */}
+    ...
+  </Grid>
+  ...
+</Grid>
+
+<Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+  <Grid container justifyContent="flex-end">
+    <Grid item xs={12} sm={10}> {/* xs=12, sm=10 のようにブレークポイントごとのサイズを指定 */}
+      ...
+    </Grid>
+    ...
+  </Grid>
+  ...
+</Container>
+```
+
+このように、ブレークポイントごとにGridアイテムのサイズを指定することで、レスポンシブデザインに対応できます。また、BoxやTypographyコンポーネントの`sx`プロパティにも、ブレークポイントごとのスタイルを指定することができます。
+
+```jsx
+<Box sx={{ width: { xs: "100%", sm: "50%" }}}> {/* xs=100%, sm=50% のようにブレークポイントごとのスタイルを指定 */}
+  ...
+</Box>
+```
+
+全体的にブレークポイントごとのスタイルを適用し、レスポンシブ対応を行ってください。

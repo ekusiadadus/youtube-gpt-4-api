@@ -5,3 +5,6 @@ run:
 
 env:
 	export $$(cat .env.local | grep -v ^#)
+
+test:
+	python3 test.py

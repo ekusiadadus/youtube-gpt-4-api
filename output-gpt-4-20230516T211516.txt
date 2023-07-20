@@ -1,0 +1,197 @@
+model: gpt-4
+time: 0:02:52.259994
+question:
+
+```TypeScript
+import { Container, Box, Grid, Typography } from "@mui/material"
+import Accordion from "@mui/material/Accordion"
+import AccordionSummary from "@mui/material/AccordionSummary"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { APIDocs } from "../../APIDocs"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+
+
+
+export const APIKey = () => {
+  console.log("APIKey")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+
+  console.log("botID", botID)
+  console.log("companyID", companyID)
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Grid container justifyContent="flex-end">
+            <Grid item xs={13}>
+              <Typography variant="h5">外部連携</Typography>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {/* <ReactMarkdown>{markdown}</ReactMarkdown> */}
+            {/* <SyntaxHighlighter language={"shell"} style={prism}>
+          {"curl -X hhoho"}
+      </SyntaxHighlighter> */}
+            <APIDocs />
+          </AccordionDetails>
+        </Accordion>
+      </Box>
+    </>
+  )
+}
+```
+
+上のコードで、埋め込みようのHTMLをユーザー側にモーダルで表示したいです。
+
+埋め込みようのHTMLは、以下のような感じです。
+
+```html
+    <script
+      id="test"
+      type="text/javascript"
+      async
+      src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+    ></script>
+    <script type="text/javascript">
+      const script = document.getElementById("test");
+      script.addEventListener("load", () => {
+        globalThis.run({ id: "ここにBOT_IDを埋め込む" });
+      });
+    </script>
+```
+
+
+id の箇所に、動的にcompany_id, bot_idを埋め込みたいです。
+最初のTypeScriptのコードに続きを書いてください。
+
+
+answer: 以下のコードに、埋め込み用のHTMLをモーダルで表示する機能を追加しました。
+
+```TypeScript
+import { Container, Box, Grid, Typography, Modal } from "@mui/material"
+import Accordion from "@mui/material/Accordion"
+import AccordionSummary from "@mui/material/AccordionSummary"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { APIDocs } from "../../APIDocs"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+import { useState } from "react"
+
+export const APIKey = () => {
+  console.log("APIKey")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+
+  console.log("botID", botID)
+  console.log("companyID", companyID)
+
+  const [open, setOpen] = useState(false)
+
+  const handleOpen = () => {
+    setOpen(true)
+  }
+
+  const handleClose = () => {
+    setOpen(false)
+  }
+
+  const embedHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <script
+      id="test"
+      type="text/javascript"
+      async
+      src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+    ></script>
+    <script type="text/javascript">
+      const script = document.getElementById("test");
+      script.addEventListener("load", () => {
+        globalThis.run({ id: "${botID}" });
+      });
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Grid container justifyContent="flex-end">
+            <Grid item xs={13}>
+              <Typography variant="h5">外部連携</Typography>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <APIDocs />
+          </AccordionDetails>
+        </Accordion>
+
+        <button onClick={handleOpen}>埋め込みコードを表示</button>
+
+        <Modal open={open} onClose={handleClose}>
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "80%",
+              backgroundColor: "white",
+              padding: "2rem",
+              overflow: "scroll",
+            }}
+          >
+            <pre>{embedHtml}</pre>
+          </div>
+        </Modal>
+      </Box>
+    </>
+  )
+}
+```
+
+ここでは、モーダルで表示するために `useState` フックを使用していることに注意してください。また、埋め込み用のHTMLコードは、変数 `embedHtml` に格納されており、必要な botID を含むように設定されています。

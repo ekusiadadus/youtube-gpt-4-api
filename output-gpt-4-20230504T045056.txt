@@ -1,0 +1,577 @@
+model: gpt-4
+time: 0:03:59.703730
+question: 
+use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Env {
+    local: String,
+    dev: String,
+    prod: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiInfo {
+    path: String,
+    desc: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiVer {
+    env: Env,
+    api: HashMap<String, ApiInfo>,
+}
+
+type ApiResponse = HashMap<String, ApiVer>;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiServer {
+    url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiOperation {
+    summary: String,
+    operation_id: String,
+    tags: Vec<String>,
+    security: Vec<OpenApiRequirements>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiRequirements {
+    #[serde(flatten)]
+    requirements: HashMap<String, Vec<String>>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiPath {
+    #[serde(flatten)]
+    operations: HashMap<String, OpenApiOperation>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiPaths {
+    #[serde(flatten)]
+    paths: HashMap<String, OpenApiPath>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiInfo {
+    title: String,
+    version: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiComponents {
+    security_schemes: HashMap<String, OpenApiSecurityScheme>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiSecurityScheme {
+    #[serde(rename = "type")]
+    type_: String,
+    scheme: String,
+    bearer_format: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiData {
+    openapi: String,
+    info: OpenApiInfo,
+    servers: Vec<OpenApiServer>,
+    paths: OpenApiPaths,
+    components: OpenApiComponents,
+}
+fn json_to_openapi(json_str: &str) -> Result<OpenApiData, serde_json::Error> {
+    let response: ApiResponse = serde_json::from_str(json_str)?;
+
+    let mut servers = Vec::new();
+    let binding = "".to_string();
+    let dev_url = response
+        .iter()
+        .next()
+        .map(|(_, api)| &api.env.dev)
+        .unwrap_or(&binding);
+    let binding = "".to_string();
+    let prod_url = response
+        .iter()
+        .next()
+        .map(|(_, api)| &api.env.prod)
+        .unwrap_or(&binding);
+    servers.push(OpenApiServer {
+        url: dev_url.to_string(),
+    });
+    servers.push(OpenApiServer {
+        url: prod_url.to_string(),
+    });
+
+    let mut openapi_paths: HashMap<String, OpenApiPath> = HashMap::new();
+    for (api_version, api_ver_info) in response {
+        for (api_name, api_info) in &api_ver_info.api {
+            let operation = OpenApiOperation {
+                summary: api_info.desc.to_string(),
+                operation_id: format!("{}_{}", api_version, api_name),
+                tags: vec![api_version.to_string()],
+                security: vec![OpenApiRequirements {
+                    requirements: vec![("BearerAuth".to_owned(), vec![])]
+                        .into_iter()
+                        .collect(),
+                }],
+            };
+            let method = "get".to_string(); // ここでは、すべてのAPI呼び出しに 'get' メソッドを使用します。
+            let path_operations = vec![(method, operation)].into_iter().collect();
+            let api_path = OpenApiPath {
+                operations: path_operations,
+            };
+            openapi_paths.insert(api_info.path.to_string(), api_path);
+        }
+    }
+
+    let info = OpenApiInfo {
+        // title today as yyyy.mm.dd:hh.mm.ss + "-m2m-cleaning"
+        title: format!(
+            "{}-m2m-cleaning",
+            chrono::Local::now().format("%Y.%m.%d:%H.%M.%S")
+        ),
+        // version set today as yyyy.mm.dd
+        version: chrono::Local::now().format("%Y.%m.%d:%H.%M.%S").to_string(),
+    };
+
+    let security_schemes: HashMap<String, OpenApiSecurityScheme> = vec![(
+        "BearerAuth".to_owned(),
+        OpenApiSecurityScheme {
+            type_: "http".to_owned(),
+            scheme: "bearer".to_owned(),
+            bearer_format: "{{JWT}}".to_owned(),
+        },
+    )]
+    .into_iter()
+    .collect();
+
+    let components = OpenApiComponents { security_schemes };
+
+    let openapi_data = OpenApiData {
+        openapi: "3.0.0".to_string(),
+        info,
+        servers,
+        paths: OpenApiPaths {
+            paths: openapi_paths,
+        },
+        components,
+    };
+
+    Ok(openapi_data)
+}
+
+fn main() {
+    let json_str: &str = &fs::read_to_string("api.json").expect("Unable to read file");
+    let openapi_data = match json_to_openapi(json_str) {
+        Ok(data) => data,
+        Err(e) => panic!("Error converting JSON to OpenAPI: {:?}", e),
+    };
+
+    let openapi_yaml_str = serde_yaml::to_string(&openapi_data).unwrap();
+    fs::write("openapi.yaml", openapi_yaml_str).expect("Unable to write YAML file");
+
+    let openapi_json_str = serde_json::to_string_pretty(&openapi_data).unwrap();
+    fs::write("openapi.json", openapi_json_str).expect("Unable to write JSON file");
+}
+
+上のコードでは、次のようなjsonが生成されます。
+
+```
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "2023.05.04:04.43.40-m2m-cleaning",
+    "version": "2023.05.04:04.43.40"
+  },
+  "servers": [
+    {
+      "url": "https://api-cleaning.dev.m2msystems.cloud"
+    },
+    {
+      "url": "https://api-cleaning.m2msystems.cloud"
+    }
+  ],
+  "paths": {
+    "/v3/mypage/cleaners": {
+      "get": {
+        "summary": "自社の清掃員一覧を取得する",
+        "operation_id": "manager-v3_listCleaners",
+        "tags": [
+          "manager-v3"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v4/listings/:listingId/keybox_rotation_histories": {
+      "get": {
+        "summary": "物件管理者がリスティングのキーボックス番号履歴を取得する",
+        "operation_id": "manager-v4_listListingKeyboxRotationHistories",
+        "tags": [
+          "manager-v4"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v3/listings/:listingId/delegation": {
+      "get": {
+        "summary": "物件の清掃管理の委譲を削除する",
+        "operation_id": "manager-v3_undelegateListing",
+        "tags": [
+          "manager-v3"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v3/photo_tour_images": {
+      "get": {
+        "summary": "写真ツアーの画像をアップロードする",
+        "operation_id": "manager-v3_uploadPhotoTourImage",
+        "tags": [
+          "manager-v3"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+
+```
+
+このコードを、paths ではなくitemによってnameによって管理される以下のようなJSON形式に変更したいです。
+
+```
+{
+	"info": {
+		"_postman_id": "2fc3a2fc-f3d2-493d-893c-fe6e46129781",
+		"name": "Twitter API v2",
+		"description": "This is a Postman Collection for the Twitter API v2 endpoints. 
+
+Refer to the main [Twitter API documentation](https://developer.twitter.com/en/docs) for more details.
+
+If you have an API-related question, you can also discuss in the developer [community forum](https://twittercommunity.com).
+
+## Installation
+
+### Quick install
+
+Go to the [Collection](https://t.co/twitter-api-postman) and click `Run in Postman`.
+
+### Manual install
+
+You can also download this Collection from a GitHub repo here: https://github.com/twitterdev/postman-twitter-api
+
+## Environment
+
+This Collection includes a pre-configured Environment. You will need to set up the following variables in order to run each request (depending on the authentication type used by the request you are sending):
+
+|Name|Description|
+|---|---|
+|`consumer_key`|Your consumer key|
+|`consumer_secret`|Your consumer secret|
+|`access_token`|Your access token|
+|`token_secret`|Your access token secret|
+|`bearer_token`|Your bearer token|
+",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "19448074"
+	},
+	"item": [
+		{
+			"name": "Tweet Lookup",
+			"item": [
+				{
+					"name": "Single Tweet",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://api.twitter.com/2/tweets/:id",
+							"protocol": "https",
+							"host": [
+								"api",
+								"twitter",
+								"com"
+							],
+							"path": [
+								"2",
+								"tweets",
+								":id"
+							],
+							"query": [
+								{
+									"key": "tweet.fields",
+									"value": "",
+									"description": "Comma-separated list of fields for the Tweet object.
+
+Allowed values:
+attachments,author_id,context_annotations,conversation_id,created_at,entities,geo,id,in_reply_to_user_id,lang,non_public_metrics,organic_metrics,possibly_sensitive,promoted_metrics,public_metrics,referenced_tweets,reply_settings,source,text,withheld,edit_history_tweet_ids,edit_controls
+
+Default values:
+id,text,edit_history_tweet_ids
+
+OAuth1.0a User Context authorization required if any of the following fields are included in the request:
+non_public_metrics,organic_metrics,promoted_metrics
+",
+									"disabled": true
+								},
+								{
+									"key": "expansions",
+									"value": "",
+									"description": "Comma-separated list of fields to expand. Expansions enable requests to expand an ID into a full object in the includes response object.
+
+Allowed values: attachments.poll_ids,attachments.media_keys,author_id,geo.place_id,in_reply_to_user_id,referenced_tweets.id,entities.mentions.username,referenced_tweets.id.author_id,edit_history_tweet_ids
+
+Default values: none",
+									"disabled": true
+								},
+
+					]
+				},
+				{
+					"name": "Single Tweet Usercontext",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://api.twitter.com/2/tweets/:id",
+							"protocol": "https",
+							"host": [
+								"api",
+								"twitter",
+								"com"
+							],
+```
+
+コードをどのように変更すれば良いでしょうか？
+
+
+answer: 以下に、Pathsを使用するのではなく、Itemsに基づいて名前で管理されるJSON形式に変更したコードを示します。JSONの構造に合わせて、コード内の構造体を変更し、json_to_openapi関数内でitemsを作成するように変更しています。
+
+```rust
+use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Env {
+    local: String,
+    dev: String,
+    prod: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiInfo {
+    path: String,
+    desc: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiVer {
+    env: Env,
+    api: HashMap<String, ApiInfo>,
+}
+
+type ApiResponse = HashMap<String, ApiVer>;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiServer {
+    url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiItem {
+    name: String,
+    request: OpenApiRequest,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiRequest {
+    method: String,
+    header: Vec<String>,
+    url: OpenApiUrl,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiUrl {
+    raw: String,
+    protocol: String,
+    host: Vec<String>,
+    path: Vec<String>,
+    query: Vec<OpenApiQuery>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiQuery {
+    key: String,
+    value: String,
+    description: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiInfo {
+    title: String,
+    version: String,
+}
+
+fn json_to_openapi(json_str: &str) -> Result<OpenApiData, serde_json::Error> {
+    let response: ApiResponse = serde_json::from_str(json_str)?;
+
+    let servers = vec![
+        OpenApiServer {
+            url: "https://api-cleaning.dev.m2msystems.cloud".to_string(),
+        },
+        OpenApiServer {
+            url: "https://api-cleaning.m2msystems.cloud".to_string(),
+        },
+    ];
+
+    let items: Vec<OpenApiItem> = response
+        .iter()
+        .flat_map(|(api_version, api_ver_info)| {
+            api_ver_info
+                .api
+                .iter()
+                .map(|(api_name, api_info)| OpenApiItem {
+                    name: format!("{}_{}", api_version, api_name),
+                    request: OpenApiRequest {
+                        method: "GET".to_string(),
+                        header: vec![],
+                        url: OpenApiUrl {
+                            raw: api_info.path.to_string(),
+                            protocol: "https".to_string(),
+                            host: vec!["example.com".to_string()],
+                            path: api_info.path.split('/').map(String::from).collect(),
+                            query: vec![OpenApiQuery {
+                                key: "version".to_string(),
+                                value: api_version.to_string(),
+                                description: api_info.desc.to_string(),
+                            }],
+                        },
+                    },
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    let openapi_data = OpenApiData {
+        info: OpenApiInfo {
+            title: format!(
+                "{}-m2m-cleaning",
+                chrono::Local::now().format("%Y.%m.%d:%H.%M.%S")
+            ),
+            version: chrono::Local::now().format("%Y.%m.%d:%H.%M.%S").to_string(),
+        },
+        servers,
+        items,
+    };
+
+    Ok(openapi_data)
+}
+
+fn main() {
+    let json_str: &str = &fs::read_to_string("api.json").expect("Unable to read file");
+    let openapi_data = match json_to_openapi(json_str) {
+        Ok(data) => data,
+        Err(e) => panic!("Error converting JSON to OpenAPI: {:?}", e),
+    };
+
+    let openapi_yaml_str = serde_yaml::to_string(&openapi_data).unwrap();
+    fs::write("openapi.yaml", openapi_yaml_str).expect("Unable to write YAML file");
+
+    let openapi_json_str = serde_json::to_string_pretty(&openapi_data).unwrap();
+    fs::write("openapi.json", openapi_json_str).expect("Unable to write JSON file");
+}
+```
+
+上記のコードを使用して変換を行うと、以下のような構造のJSONが生成されます。
+```
+{
+  "info": {
+    "title": "2023.05.04:04.43.40-m2m-cleaning",
+    "version": "2023.05.04:04.43.40"
+  },
+  "servers": [
+    {
+      "url": "https://api-cleaning.dev.m2msystems.cloud"
+    },
+    {
+      "url": "https://api-cleaning.m2msystems.cloud"
+    }
+  ],
+  "items": [
+    {
+      "name": "manager-v3_listCleaners",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "/v3/mypage/cleaners",
+          "protocol": "https",
+          "host": [
+            "example.com"
+          ],
+          "path": [
+            "v3",
+            "mypage",
+            "cleaners"
+          ],
+          "query": [
+            {
+              "key": "version",
+              "value": "manager-v3",
+              "description": "自社の清掃員一覧を取得する"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "manager-v4_listListingKeyboxRotationHistories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "/v4/listings/:listingId/keybox_rotation_histories",
+          "protocol": "https",
+          "host": [
+            "example.com"
+          ],
+          "path": [
+            "v4",
+            "listings",
+            ":listingId",
+            "keybox_rotation_histories"
+          ],
+          "query": [
+            {
+              "key": "version",
+              "value": "manager-v4",
+              "description": "物件管理者がリスティングのキーボックス番号履歴を取得する"
+            }
+          ]
+        }
+      }
+    },
+
+      ...
+  ]
+}
+```

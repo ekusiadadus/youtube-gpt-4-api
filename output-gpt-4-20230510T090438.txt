@@ -1,0 +1,394 @@
+model: gpt-4
+time: 0:01:55.330586
+question: 
+
+```python
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import List, Optional
+from pydantic import BaseModel
+from decimal import Decimal
+
+from boto3.session import Session
+from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
+
+from models import ResourceMetaBase, DocsMeta, BotMeta, ChatHistory, AnnotationMeta
+from logger import Logger
+
+serializer = TypeSerializer()
+deserializer = TypeDeserializer()
+
+logger = Logger(__name__)
+
+
+def _deserialize(value):
+    deserialized = deserializer.deserialize(value)
+    if not isinstance(deserialized, Decimal):
+        return deserialized
+    if int(deserialized) == deserialized:
+        return int(deserialized)
+    return float(deserialized)
+
+
+class ResourceMetaKeys(BaseModel):
+    partition_key: str
+    sort_key: str
+
+    @staticmethod
+    def create(company_id: str, resource_type: str, resource_id: str) -> ResourceMetaKeys:
+        return ResourceMetaKeys(partition_key=company_id, sort_key=f"{resource_type}#{resource_id}")
+
+    @property
+    def expression4get(self) -> dict:
+        return {k: serializer.serialize(v) for k, v in self.asdict().items()}
+
+    def asdict(self) -> dict:
+        return {"partition_key": self.partition_key, "sort_key": self.sort_key}
+
+
+class ResourceMetaClient:
+    def __init__(self, env: str, region: str = "ap-northeast-1"):
+        self.__table_name = f"resource_meta_{env}"
+        self.__client = Session().client("dynamodb", region_name=region)
+
+    def put(self, resource_meta: ResourceMetaBase) -> ResourceMetaBase:
+        parameters = {"TableName": self.__table_name, "Item": self.__resource_meta2item(resource_meta)}
+        return self.__client.put_item(**parameters)
+
+    def __resource_meta2item(self, resource: ResourceMetaBase):
+        items = resource.to_dict()
+        items["partition_key"] = items["company_id"]
+        items["sort_key"] = items["resource_id"]
+        # nullに除外で対処
+        return {k: serializer.serialize(v) for k, v in items.items() if v is not None}  # noqa E501
+
+    def get_docs_meta(self, company_id: str, resource_id: str) -> DocsMeta:
+        keys = ResourceMetaKeys.create(company_id=company_id, resource_type="docs", resource_id=resource_id)
+        parameters = {
+            "TableName": self.__table_name,
+            "Key": keys.expression4get,
+            "ProjectionExpression": ','.join(DocsMeta.props4get())
+            }
+        res = self.__client.get_item(**parameters)
+        if "Item" not in res:
+            raise KeyError(
+                f'Item with the couple of keys not found.
+            Partition Key: {keys.partition_key}, Sort Key: {keys.sort_key}'
+            )
+        return self.__item2docs_meta(res["Item"])
+
+    def get_annotation_metas(self, company_id: str, resource_id: str) -> None | tuple[AnnotationMeta, AnnotationMeta]:
+        ###
+        questionとanswerのAnnotationペアを返却
+        ###
+        keys = ResourceMetaKeys.create(company_id=company_id, resource_type="annotation", resource_id=resource_id)
+        res = self.__client.query(
+            TableName=self.__table_name,
+            KeyConditionExpression="partition_key = :company_id AND begins_with ( sort_key, :sort_key )",
+            ExpressionAttributeValues={
+                ":company_id": {"S": company_id},
+                ":sort_key": {"S": f"annotation#{resource_id}"},
+            },
+        )
+
+        if "Items" not in res:
+            raise KeyError(
+                f'Item with the couple of keys not found.
+            Partition Key: {keys.partition_key}, Sort Key: {keys.sort_key}'
+            )
+        if res["Items"] == []:
+            return
+
+        for item in res["Items"]:
+            if item["resource_name"]["S"] == "annotation_answer":
+                answer = AnnotationMeta.from_dynamo_response_item_dict(item)
+            else:
+                question = AnnotationMeta.from_dynamo_response_item_dict(item)
+        try:
+            question, answer = question, answer
+        except Exception as e:
+            # UPDATEME: logger.exception or error
+            logger.info("Failed to get annotation pair from dynamo.")
+            raise e
+
+        return question, answer
+
+    def __list_to_projection_expression(self, list) -> str:
+        # boto3のget_itemsに渡すProjectionExpressionの要求する形式に変換する
+        expression = ""
+        for attribute in list:
+            expression = expression + attribute + ","
+        expression.rstrip()
+        return expression
+
+    def __item2docs_meta(self, item) -> ResourceMetaBase:
+        logger.info(f"(__item2docs_meta) item before desirialized: {item}")
+        deserialized = {k: self.__to_valid_type(deserializer.deserialize(v)) for k, v in item.items()}
+        logger.info(f"(__item2docs_meta) item after desirialized: {deserialized}")
+        return DocsMeta.from_dict(deserialized)
+
+    def __to_valid_type(self, value) -> object:  # Don't allow decimals
+        if isinstance(value, Decimal):
+            if int(value) == value:
+                return int(value)
+            else:
+                raise TypeError("Numbers in table should only be int, but decimal was found")
+        else:
+            return value
+
+    def get_bot_meta(self, company_id: str, resource_id: str) -> BotMeta:
+        keys = ResourceMetaKeys.create(company_id=company_id, resource_type="bot", resource_id=resource_id)
+        parameters = {"TableName": self.__table_name, "Key": keys.expression4get}
+        res = self.__client.get_item(**parameters)
+        if "Item" not in res:
+            raise KeyError(
+                f'Item with the couple of keys not found.
+            Partition Key: {keys.partition_key}, Sort Key: {keys.sort_key}'
+            )
+        return self.__item2bot_meta(res["Item"])
+
+    def __item2bot_meta(self, item) -> ResourceMetaBase:
+        logger.info(f"(__item2bot_meta) item before deserialized: {item}")
+        deserialized = {k: _deserialize(v) for k, v in item.items()}
+        logger.info(f"(__item2bot_meta) item after deserialized: {deserialized}")
+        return BotMeta.from_dict(deserialized)
+
+    def list_docs_meta(self, company_id: str, order_by: Optional[str] = None, asc: bool = False) -> List[DocsMeta]:
+        parameters = {
+            "TableName": self.__table_name,
+            "KeyConditionExpression": "partition_key = :company_id" " AND begins_with(sort_key, :resource_type)",
+            "ExpressionAttributeValues": {
+                ":company_id": serializer.serialize(company_id),
+                ":resource_type": serializer.serialize("docs"),
+            },
+            "Select": "SPECIFIC_ATTRIBUTES",
+            "ProjectionExpression": ",".join(DocsMeta.props4list()),
+        }
+        if order_by:
+            parameters["IndexName"] = order_by
+            parameters["ScanIndexForward"] = asc
+        res = self.__client.query(**parameters)
+        return [self.__item2docs_meta(item) for item in res["Items"]]
+
+    def list_bots_meta(
+        self,
+        company_id: str,
+        oeder_by: Optional[str] = None,
+        asc: bool = False,
+    ) -> List[BotMeta]:
+        parameters = {
+            "TableName": self.__table_name,
+            "KeyConditionExpression": "partition_key = :company_id" " AND begins_with(sort_key, :resource_type)",
+            "ExpressionAttributeValues": {
+                ":company_id": serializer.serialize(company_id),
+                ":resource_type": serializer.serialize("bot"),
+            },
+        }
+        if oeder_by:
+            parameters["IndexName"] = oeder_by
+            parameters["ScanIndexForward"] = asc
+        res = self.__client.query(**parameters)
+        return [self.__item2bot_meta(item) for item in res["Items"]]
+
+
+class ChatHistoryClientBase(ABC):
+    @abstractmethod
+    def put(self, chat_history: ChatHistory):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get(self, bot_id: str, user_id: str, created_at: int, posted_at: int, updated_at: Optional[int]):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def list_chat_history_by_bot_id_user_id_history_id(self, bot_id: str, user_id: str, history_id: str):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def list_chat_history_by_bot_id(self, bot_id: str, filterExpression: Optional[any]):
+        raise NotImplementedError()
+
+
+class ChatHistoryClient(ChatHistoryClientBase):
+    def __init__(self, env: str, region: str = "ap-northeast-1"):
+        self.table_name = f"chat_history_{env}"
+        self.client = Session().client("dynamodb", region_name=region)
+
+    def put(self, chat_history: ChatHistory) -> ChatHistory:
+        attributes = {"TableName": self.table_name, "Item": self.__chat_history2items(chat_history)}
+        self.client.put_item(**attributes)
+
+    def __chat_history2items(self, chat_history: ChatHistory) -> dict:
+        items = chat_history.to_dict()
+        items["partition_key"] = items["bot_id"]
+        if items["updated_at"] is None:
+            items.pop("updated_at")
+            items.pop("updated_by")
+            items["sort_key"] = f"{items['user_id']}#{items['created_at']}#{items['posted_at']}#"  # noqa E501
+        else:
+            items[
+                "sort_key"
+            ] = f"{items['user_id']}#{items['created_at']}#{items['posted_at']}#{items['updated_at']}"  # noqa E501
+        return {k: serializer.serialize(v) for k, v in items.items()}
+
+    def __item2chat_history(self, item: dict) -> ChatHistory:
+        logger.info(f"(__item2chat_history)item before desirialized: {item}")
+        deserialized = {k: deserializer.deserialize(v) for k, v in item.items()}
+        logger.info(f"(__item2chat_history)item after desirialized: {deserialized}")
+        return ChatHistory.from_deserialized_dict(deserialized)
+
+    def get(self, bot_id: str, user_id: str, created_at: int, posted_at: int, updated_at: Optional[int] = None):
+        # keys = ResourceMetaKeys.create(company_id=company_id, resource_type="docs", resource_id=resource_id)
+        partitionKey = bot_id
+        sortKey = (
+            f"{user_id}#{created_at}#{posted_at}#"
+            if updated_at is None
+            else f"{user_id}#{created_at}#{posted_at}#{updated_at}"
+        )
+
+        parameters = {
+            "TableName": self.table_name,
+            "Key": {"partition_key": {"S": partitionKey}, "sort_key": {"S": sortKey}},
+        }
+        res = self.client.get_item(**parameters)
+        if "Item" not in res:
+            raise KeyError(
+                f'Item with the couple of keys not found.
+            Partition Key: {partitionKey}, Sort Key: {sortKey}'
+            )
+        return self.__item2chat_history(res["Item"])
+
+    def list_chat_history_by_bot_id(self, bot_id: str) -> list[ChatHistory]:
+        parameters = {
+            "TableName": self.table_name,
+            "KeyConditionExpression": "partition_key = :bot_id",
+            "ExpressionAttributeValues": {
+                ":bot_id": serializer.serialize(bot_id),
+            },
+        }
+        parameters["ScanIndexForward"] = False
+        res = self.client.query(**parameters)
+        return [self.__item2chat_history(item) for item in res["Items"]]
+
+    def list_chat_history_by_bot_id_user_id_history_id(
+        self, bot_id: str, user_id: str, created_at: int
+    ) -> list[ChatHistory]:
+        parameters = {
+            "TableName": self.table_name,
+            "KeyConditionExpression": "partition_key = :bot_id" " AND begins_with(sort_key, :user_id_history_id)",
+            "ExpressionAttributeValues": {
+                ":bot_id": serializer.serialize(bot_id),
+                ":user_id_history_id": serializer.serialize(f"{user_id}#{created_at}"),
+            },
+        }
+        parameters["ScanIndexForward"] = False
+        res = self.client.query(**parameters)
+        return [self.__item2chat_history(item) for item in res["Items"]]
+```
+
+```
+  UserTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: company_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName:
+            Fn::Join:
+              - "-"
+              - - CompanyIdIndex
+                - Ref: env
+          KeySchema:
+            - AttributeName: company_id
+              KeyType: HASH
+            - AttributeName: user_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+      TableName:
+        Fn::Join:
+          - _
+          - - user
+            - Ref: env
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+```
+
+上のコードに対して、UserTableのクライアントを新しく追加してください。
+
+
+answer: 以下に示すように、UserTableのクライアントを追加しました。UserTableClientクラスを定義し、put、get、list_users_by_company_idメソッドを実装しています。
+
+```python
+class UserTableKeys(BaseModel):
+    user_id: str
+    company_id: str
+
+    @staticmethod
+    def create(user_id: str, company_id: str) -> UserTableKeys:
+        return UserTableKeys(user_id=user_id, company_id=company_id)
+
+    def asdict(self) -> dict:
+        return {"user_id": self.user_id, "company_id": self.company_id}
+
+
+class UserTableClient:
+    def __init__(self, env: str, region: str = "ap-northeast-1"):
+        self.__table_name = f"user_{env}"
+        self.__client = Session().client("dynamodb", region_name=region)
+
+    def put(self, user: UserTableBase) -> UserTableBase:
+        parameters = {"TableName": self.__table_name, "Item": self.__user_table2item(user)}
+        return self.__client.put_item(**parameters)
+
+    def __user_table2item(self, user: UserTableBase):
+        items = user.to_dict()
+        return {k: serializer.serialize(v) for k, v in items.items() if v is not None}
+
+    def get(self, user_id: str) -> UserTableBase:
+        keys = UserTableKeys.create(user_id=user_id)
+        parameters = {"TableName": self.__table_name, "Key": keys.asdict()}
+        res = self.__client.get_item(**parameters)
+        if "Item" not in res:
+            raise KeyError(f'Item with the user_id: {user_id} not found.')
+        return self.__item2user_table(res["Item"])
+
+    def __item2user_table(self, item) -> UserTableBase:
+        deserialized = {k: _deserialize(v) for k, v in item.items()}
+        return UserTableBase.from_dict(deserialized)
+
+    def list_users_by_company_id(self, company_id: str) -> List[UserTableBase]:
+        parameters = {
+            "TableName": self.__table_name,
+            "IndexName": f"CompanyIdIndex-{company_id}",
+            "KeyConditionExpression": "company_id = :company_id",
+            "ExpressionAttributeValues": {
+                ":company_id": serializer.serialize(company_id),
+            },
+        }
+
+        res = self.__client.query(**parameters)
+        return [self.__item2user_table(item) for item in res["Items"]]
+
+
+class UserTableBase(BaseModel):
+    user_id: str
+    company_id: str
+    # Add other attributes here as needed
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        return cls(**data)
+```
+
+追加したUserTableClientクラスを適切な方法でインスタンス化し、put、get、list_users_by_company_idメソッドを使用してUserTableとやりとりできます。

@@ -1,0 +1,106 @@
+これが改善版のコードです。WebSocket接続を閉じてから、接続リストから削除します。また、各クライアントは一意の `bot_id`を持つことを確認するため、`bot_id`の生成方法を変更しました。
+
+```python
+from typing import Dict, List
+
+from fastapi import WebSocket
+
+from domain.model.message import Message
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+        self.id_count: int = 0
+
+    async def connect(self, websocket: WebSocket, bot_id: str):
+        if bot_id in self.active_connections:
+            self.active_connections[bot_id].append(websocket)
+        else:
+            self.active_connections[bot_id] = [websocket]
+        await websocket.accept()
+        self.id_count += 1
+
+    async def disconnect(self, bot_id: str):
+        for connection in self.active_connections[bot_id]:
+            await connection.close()
+        self.active_connections.pop(bot_id)
+
+    async def send_message(self, message: str, bot_id: str):
+        for connection in self.active_connections[bot_id]:
+            await connection.send_text(message)
+
+    async def send_json(self, message: Message, bot_id: str):
+        for connection in self.active_connections[bot_id]:
+            await connection.send_json(message.to_dict())
+
+# Bot_id is now generated and unique to every client.
+@app.websocket(
+    "/ws/chat/{user_id}",
+    name="chat",
+)
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+):
+    bot_id = str(manager.id_count)
+    await manager.connect(websocket, bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id=user_id,
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.chat_handler.web_socket_chat(
+                chat_id=chat.id,
+                user_id=user_id,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(bot_id)
+
+@app.websocket(
+    "/cs/chat",
+    name="CS chat",
+)
+async def cs_chat(
+    websocket: WebSocket,
+):
+    bot_id = str(manager.id_count)
+    await manager.connect(websocket, bot_id=bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id="1",
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.cs_handler.cs_chat(
+                chat_id=chat.id,
+                user_id=None,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(bot_id)
+```
+
+このコードは各WebSocketが正しく閉じられ、メモリリークが予防されます。また、`bot_id`は一意に生成され、競合を避けます。

@@ -1,0 +1,108 @@
+model: gpt-4
+time: 0:01:25.212648
+question: 
+
+```python
+class UserClient(UserClientBase):
+    def __init__(self, env: str, region: str = "ap-northeast-1"):
+        self.table_name = f"user_{env}"
+        self.company_id_index = f"CompanyIdIndex-{env}"
+        self.client = Session().client("dynamodb", region_name=region)
+
+    def get(self, user_id: str, company_id: str) -> User:
+        # keys = ResourceMetaKeys.create(company_id=company_id, resource_type="docs", resource_id=resource_id)
+        partitionKey = user_id
+        sortKey = company_id
+
+        parameters = {
+            "TableName": self.table_name,
+            "IndexName": self.company_id_index,
+            "Select": "ALL_ATTRIBUTES",
+            "KeyConditionExpression": "user_id = :user_id AND company_id = :company_id",
+            "ExpressionAttributeValues": {
+                ":user_id": {"S": user_id},
+                ":company_id": {"S": company_id},
+            },
+        }
+
+        # dynamo clientにてGSIでのget方法の公式ドキュメントの記載がなかったため一旦queryで対応
+
+        # res = self.client.get_item(**parameters)
+        res = self.client.query(**parameters)
+        if "Items" not in res:
+            raise KeyError(
+                f'''Item with the couple of keys not found.
+            Partition Key: {partitionKey}, Sort Key: {sortKey}'''
+            )
+        return User.from_dynamo_item(res["Items"][0])
+
+    def get_or_none(self, user_id: str, company_id: str) -> User | None:
+        try:
+            user: User = self.get(user_id=user_id, company_id=company_id)
+            return user
+        except Exception:
+            return None
+```
+
+add create User with parameter user_id, company_id, family_name, given_name, email
+
+
+
+answer: Here's the modified UserClient class with the create method:
+
+```python
+class UserClient(UserClientBase):
+    def __init__(self, env: str, region: str = "ap-northeast-1"):
+        self.table_name = f"user_{env}"
+        self.company_id_index = f"CompanyIdIndex-{env}"
+        self.client = Session().client("dynamodb", region_name=region)
+
+    def get(self, user_id: str, company_id: str) -> User:
+        partitionKey = user_id
+        sortKey = company_id
+
+        parameters = {
+            "TableName": self.table_name,
+            "IndexName": self.company_id_index,
+            "Select": "ALL_ATTRIBUTES",
+            "KeyConditionExpression": "user_id = :user_id AND company_id = :company_id",
+            "ExpressionAttributeValues": {
+                ":user_id": {"S": user_id},
+                ":company_id": {"S": company_id},
+            },
+        }
+
+        res = self.client.query(**parameters)
+        if "Items" not in res:
+            raise KeyError(
+                f'''Item with the couple of keys not found.
+            Partition Key: {partitionKey}, Sort Key: {sortKey}'''
+            )
+        return User.from_dynamo_item(res["Items"][0])
+
+    def get_or_none(self, user_id: str, company_id: str) -> User | None:
+        try:
+            user: User = self.get(user_id=user_id, company_id=company_id)
+            return user
+        except Exception:
+            return None
+    
+    def create(self, user_id: str, company_id: str, family_name: str, given_name: str, email: str) -> User:
+        item = {
+            "user_id": {"S": user_id},
+            "company_id": {"S": company_id},
+            "family_name": {"S": family_name},
+            "given_name": {"S": given_name},
+            "email": {"S": email}
+        }
+        
+        parameters = {
+            "TableName": self.table_name,
+            "Item": item
+        }
+
+        self.client.put_item(**parameters)
+        return User.from_dynamo_item(item)
+```
+
+I've added the `create` method that takes `user_id`, `company_id`, `family_name`, `given_name`, and `email` as parameters, creates a new user, and stores it in the DynamoDB table. The method returns the created User instance.

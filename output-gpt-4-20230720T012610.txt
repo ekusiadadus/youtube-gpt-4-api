@@ -1,0 +1,84 @@
+model: gpt-4
+time: 0:00:53.730417
+question: @app.websocket(
+    "/cs/chat",
+    name="CS chat",
+    # WebSocketの接続を認証する箇所をどうしようか検討する
+    # dependencies=[Depends(server.auth_service)],
+)
+async def cs_chat(
+    websocket: WebSocket,
+):
+    bot_id = "1"
+    await manager.connect(websocket, bot_id=bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id="1",
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.cs_handler.cs_chat(
+                chat_id=chat.id,
+                user_id=None,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket, bot_id)
+
+上のFastAPIのwebsocketコードで、websocketの接続を保持し続けているので、修正したいです。
+どのようにすべきですか？
+
+answer: 現状のコードでは`while True:`で無限ループしていますが、基本的にWebSocketはクライアント側からのメッセージを待ち受けたり、サーバー側からメッセージを送ったりするために接続を続けておく必要があります。
+
+しかし、WebSocketは普通に切断（close）することも可能ですし、何かしらのエラーにより強制的に切断（disconnect）されることもあります。後者の場合は例外処理でcatchすることができますが、前者についてはそれをせずに無限ループすると問題になります。クライアント側からの切断要求を期待している場合、それをループ内でチェックする必要があります。
+
+だからこそ、あなたが用意している WebSocketDisconnect 例外ハンドリングに await manager.disconnect(websocket, bot_id) を行っていますが、それは強制的な切断時のみ対応可能です。
+
+正常にクライアントから切断したい場合、特定のメッセージを受信した際にループを抜けて切断するといった処理が必要になります。こちらのサンプルコードを参考にしてみてください。
+
+```python
+async def cs_chat(
+    websocket: WebSocket,
+):
+    bot_id = "1"
+    await manager.connect(websocket, bot_id=bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id="1",
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+            if data == "disconnect":  # 切断用のメッセージを受信
+                break
+
+            res = await server.cs_handler.cs_chat(
+                chat_id=chat.id,
+                user_id=None,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket, bot_id)
+    finally:
+        await websocket.close()  # 正常な切断
+```
+
+このサンプルコードでは、クライアントから "disconnect" というメッセージを受信したらループを抜け、`websocket.close()` で正常に切断しています。このような処理を追加することで、クライアントからの切断要求に対応することができます。

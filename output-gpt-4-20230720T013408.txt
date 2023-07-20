@@ -1,0 +1,161 @@
+model: gpt-4
+time: 0:00:47.854338
+question: from typing import Dict, List
+
+from fastapi import WebSocket
+
+from domain.model.message import Message
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, bot_id: str):
+        if bot_id in self.active_connections:
+            self.active_connections[bot_id].append(websocket)
+        else:
+            self.active_connections[bot_id] = [websocket]
+        await websocket.accept()
+
+    async def disconnect(self, websocket: WebSocket, bot_id: str):
+        self.active_connections[bot_id].remove(websocket)
+
+    async def send_message(self, message: str, bot_id: str):
+        for connection in self.active_connections[bot_id]:
+            await connection.send_text(message)
+
+    async def send_json(self, message: Message, bot_id: str):
+        for connection in self.active_connections[bot_id]:
+            await connection.send_json(message.to_dict())
+
+import uvicorn
+from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
+
+from domain.model.chat_history import ChatHistory
+
+manager = ConnectionManager()
+
+server = Server()
+@app.websocket(
+    "/ws/chat/{user_id}/{bot_id}",
+    name="chat",
+    # WebSocketの接続を認証する箇所をどうしようか検討する
+    # dependencies=[Depends(server.auth_service)],
+)
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+    bot_id: str,
+):
+    await manager.connect(websocket, bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id=user_id,
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.chat_handler.web_socket_chat(
+                chat_id=chat.id,
+                user_id=user_id,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket, bot_id)
+
+
+@app.websocket(
+    "/cs/chat",
+    name="CS chat",
+    # WebSocketの接続を認証する箇所をどうしようか検討する
+    # dependencies=[Depends(server.auth_service)],
+)
+async def cs_chat(
+    websocket: WebSocket,
+):
+    bot_id = "1"
+    await manager.connect(websocket, bot_id=bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id="1",
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.cs_handler.cs_chat(
+                chat_id=chat.id,
+                user_id=None,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket, bot_id)
+
+
+上のコードをよリ良いコードにしてください
+
+answer: 元のコードはすでに高い品質で整理されていますが、重複コードを減らすために少しリファクタリングをしてみましょう。
+
+`websocket_endpoint`と`cs_chat`エンドポイントは非常によく似ており、一部の処理を共有するかリファクタリングする可能性があります。また、`user_id`と`bot_id`のパラメータをそのまま`chat`関数に渡し、その関数が新しいチャットを作成することも可能です。
+
+以下にその改善点を反映したコードを示します。
+
+```python
+async def create_chat(user_id: str, bot_id: str, data: str, handler, websocket: WebSocket) -> None:
+    await manager.connect(websocket, bot_id=bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id=user_id,
+            name="",
+            description="",
+            messages=[],
+        )
+        while True:
+            data = await websocket.receive_text()
+
+            res = await handler(
+                chat_id=chat.id,
+                user_id=user_id,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket, bot_id=bot_id)   
+
+@app.websocket("/ws/chat/{user_id}/{bot_id}", name="chat")
+async def websocket_endpoint(websocket: WebSocket, user_id: str, bot_id: str):
+    await create_chat(user_id, bot_id, server.chat_handler.web_socket_chat, websocket)
+
+@app.websocket("/cs/chat", name="CS chat")
+async def cs_chat(websocket: WebSocket):
+    bot_id = "1"
+    user_id = "1"
+    await create_chat(user_id, bot_id, server.cs_handler.cs_chat, websocket)
+```
+
+このように共通の振る舞いを関数に抽出することで、コードの読みやすさが向上し、メンテナンス性も改善します。APIルート間でのコードの重複を減らし、各ルートが何をしているのかを明確に理解することが容易になります。
+
+ただし、共通関数`create_chat`が多くのパラメータを受け取り、その一部が特定のハンドラに固有であるということに注意する必要があります。策略パターンを用いるとこの問題を解決できます。

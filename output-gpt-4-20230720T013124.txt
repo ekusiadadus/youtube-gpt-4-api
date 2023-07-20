@@ -1,0 +1,111 @@
+model: gpt-4
+time: 0:00:53.037086
+question: class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, bot_id: str):
+        if bot_id in self.active_connections:
+            self.active_connections[bot_id].append(websocket)
+        else:
+            self.active_connections[bot_id] = [websocket]
+        await websocket.accept()
+
+    async def disconnect(self, websocket: WebSocket, bot_id: str):
+        self.active_connections[bot_id].remove(websocket)
+
+    async def send_message(self, message: str, bot_id: str):
+        for connection in self.active_connections[bot_id]:
+            await connection.send_text(message)
+
+    async def send_json(self, message: Message, bot_id: str):
+        for connection in self.active_connections[bot_id]:
+            await connection.send_json(message.to_dict())
+
+manager = ConnectionManager()
+
+@app.websocket(
+    "/cs/chat",
+    name="CS chat",
+    # WebSocketの接続を認証する箇所をどうしようか検討する
+    # dependencies=[Depends(server.auth_service)],
+)
+async def cs_chat(
+    websocket: WebSocket,
+):
+    bot_id = "1"
+    await manager.connect(websocket, bot_id=bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id="1",
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.cs_handler.cs_chat(
+                chat_id=chat.id,
+                user_id=None,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket, bot_id)
+
+上のFastAPIのwebsocketコードで、websocketの接続を保持し続けているので、修正したいです。
+具体的には、定期的にpingを送信して、pongを受け取ることで、接続を保持するかを決定したいです。
+どのようにすべきですか？
+
+answer: FastAPIでは、WebSocket APIを使ってクライアントとサーバーの間でリアルタイムの双方向通信を行うことができます。接続が生きているかを確認するために、通常は定期的にpingメッセージを送信し、それに対するpongメッセージを受け取ることが一般的です。以下の方法で実装できます：
+
+```python
+from starlette.websockets import WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
+from asyncio import sleep
+
+app = FastAPI()
+
+@app.websocket("/")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"Message text was: {data}")
+        await sleep(10)
+        await websocket.send_text("ping")
+```
+
+この例では、WebSocketに接続した後、受け取ったメッセージの内容をそのまま送り返し、その10秒後に "ping" メッセージを送ります。この "ping" メッセージに対する応答（"pong"やエラーメッセージ）は、WebSocketクライアント（ブラウザまたは他のサービス）によって処理されます。
+
+「pong」の返答を待つコードは以下のようになります：
+
+```python
+from starlette.websockets import WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
+from asyncio import sleep
+
+app = FastAPI()
+
+@app.websocket("/")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+
+        # If received data is the ping message
+        if data == "ping":
+            await websocket.send_text("pong")
+        else:
+            await websocket.send_text(f"Message text was: {data}")
+            await sleep(10)
+            await websocket.send_text("ping")
+```
+
+この例では、もしサーバーが "ping" メッセージを受け取った場合、それに対する "pong" メッセージを返すように設定しています。

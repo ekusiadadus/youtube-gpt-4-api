@@ -1,0 +1,610 @@
+model: gpt-4
+time: 0:01:56.761979
+question: 
+users
+Japanese	name	data type	default	key	NULL	Validation	remarks
+ID	id	bigint	autoincrement	PK	Not NULL	-
+メールアドレス	email	string				include @
+パスワード	password	string				10 to 20 half-width alphanumeric characters
+氏名	full_name	string				-
+電話番号	telephone	string				only numeric,
+企業名	company	string
+宅地建物取引業者免許番号	real_estate_license_number	string
+
+役職	designation	string
+所属/ Affiliation	department	string					Affiliation/Departments
+
+プロフィール	profile	string
+経歴・実績	career_achievements	string
+得意領域	proud_fields	oneToMany Relation	user_proud_fields[proud_field_id, user_id]
+得意エリア	strong_area	oneToMany Relation	user_strong_areas[prefecture_id, municipality_id, user_id]
+得意な価格帯	price_start	number
+	price_end	number
+アイコン用写真	storage_file_id	OneToOne Relation	storage_files table
+管理者フラグ	admin	boolean	FALSE				"administrator = True
+normal user = False"
+作成日時	created_at	timestamp
+更新日時	updated_at	timestamp
+削除日時	deleted_at	timestamp
+	is_active	boolean	0
+	is_email_verified	boolean	0
+	is_profile_created	boolean	0
+	current_login_mode	string	seller
+	user_roles	oneToMany Relation	user_roles[user_id]
+
+
+
+
+
+user_strong_areas
+Japanese	name	data type	default	key	NULL	Validation	remarks
+ID	ID	string	unique random	PK	Not NULL	-
+user_id	user_id	number		unique_prefecture_municipality
+都道府県	prefecture_id	number
+市区町村	municipality_id	number
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+user_proud_fields
+ID	ID	string	unique random	PK	Not NULL	-
+user_id	user_id	number		unique_prefecture_municipality
+	proud_field_id	number
+
+
+auth_emails
+Japanese	name	data type	default	key	NULL	Validation	remarks
+ID	ID	string	unique random	PK	Not NULL
+メールアドレス	email	string			Not Null
+認証コード	random_code	string			Not Null	6 character, Auto generate random string	6 character, Auto generate random string
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+	expires_at	timestamp
+
+
+properties
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+user_id	user_id	string
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+
+buildings
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+propertie_id	propertie_id			FK	Not NULL
+
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+
+lands
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+propertie_id	propertie_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+rooms
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+propertie_id	propertie_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+building_assessments
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+propertie_id	propertie_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+land_assessments
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+land_id	land_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+room_assessments
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+room_id	land_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+
+
+
+
+
+
+building_simulations
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+propertie_id	propertie_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+land_simulations
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+land_id	land_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+room_simulations
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+room_id	land_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+land_digestion_volumes
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+land_id	land_id
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+property_similars
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+	username
+	email
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+
+
+
+labels
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+
+ラベル名	name	string	unique_label_name[created_by_id, name]
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+	created_by_id	number
+	updated_by_id	number
+
+
+
+
+buyers
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+user_id				FK users	NULL	idがセットされている場合は、usersから情報取得
+メールアドレス	username
+氏名	email
+電話番号	role
+企業名
+所属・部署
+役職
+	email	string	required
+	full_name	string	required
+	telephone	string
+	company	string
+Affiliation	department	string
+	designation	string
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+buyer_labels
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+buyer_user_id	buyer_id
+label_id	label_id
+created_at	created_at	timestamp			Not Null
+
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+	created_by_id	number
+	updated_by_id	number
+
+
+buyer_needs
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+user_id	user_id
+タイトル	title
+詳細	detail
+物件種別	By property
+エリア	area
+価格	price
+表面利回り	Surface yield
+築年数	Age
+沿線	Along the line
+最寄り駅までの徒歩分数	Frequently walked to the nearest station	integer
+構造	structure	array			NULL	RC/SRC,鉄骨,軽量鉄骨,木造,その他
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+buyer_needs_station
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+buyer_need.id	buyer_need_id
+路線	Route
+駅	station
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+
+
+emails
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+件名	subject
+本文	Text
+物件ID	Property ID
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+histories
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+email_id	Email_id
+送信先メールアドレス	Sending destination email address
+送信可否	Or not	boolean
+開封可否	Openings	boolean
+購入意向	Intention to purchase	boolean
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+
+
+
+access_users
+Japanese	name	data type	default	key	NULL	remarks
+ID	ID	string	unique random	PK	Not NULL
+email_id	email_id	stirng
+seller_id	seller_user_id	string
+buyer_id	buyer_user_id	string		FK users	Not NULL
+物件_id	properties_id	string		FK properties	Not NULL
+開封_flg	open_flg	boolean
+提案書閲覧_flg	view_flg	boolean
+購入意向_flg	intent_flg	boolean
+価格	price
+コメント	comment	string
+購入意向_comment	購入意向_created	timestamp
+created_at	created_at	timestamp			Not Null
+updated_at	updated_at	timestamp			Not Null
+deleted_at	deleted_at	timestamp			Null
+
+上記DBをmermaid形式で、出力してください。
+
+
+answer: ```mermaid
+erDiagram
+
+  users {
+    id bigint PK
+    email string
+    password string
+    full_name string
+    telephone string
+    company string
+    real_estate_license_number string
+    designation string
+    department string
+    profile string
+    career_achievements string
+    proud_fields user_proud_fields(proud_field_id, user_id) 1..*
+    strong_area user_strong_areas(prefecture_id, municipality_id, user_id) 1..*
+    price_start number
+    price_end number
+    storage_file_id storage_files 1..1
+    admin boolean
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+    is_active boolean
+    is_email_verified boolean
+    is_profile_created boolean
+    current_login_mode string
+    user_roles user_roles(user_id) 1..*
+  }
+
+  user_strong_areas {
+    id string PK
+    user_id number
+    prefecture_id number
+    municipality_id number
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  user_proud_fields {
+    id string PK
+    user_id number
+    proud_field_id number
+  }
+
+  auth_emails {
+    id string PK
+    email string
+    random_code string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+    expires_at timestamp
+  }
+
+  properties {
+    id string PK
+    user_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  buildings {
+    id string PK
+    propertie_id string FK
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  lands {
+    id string PK
+    propertie_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  rooms {
+    id string PK
+    propertie_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  building_assessments {
+    id string PK
+    propertie_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  land_assessments {
+    id string PK
+    land_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  room_assessments {
+    id string PK
+    room_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  building_simulations {
+    id string PK
+    propertie_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  land_simulations {
+    id string PK
+    land_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  room_simulations {
+    id string PK
+    room_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  land_digestion_volumes {
+    id string PK
+    land_id string
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  property_similars {
+    id string PK
+    username
+    email
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  labels {
+    id string PK
+    name string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+    created_by_id number
+    updated_by_id number
+  }
+
+  buyers {
+    id string PK
+    user_id string FK
+    email string
+    full_name string
+    telephone string
+    company string
+    department string
+    designation string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  buyer_labels {
+    id string PK
+    buyer_id string
+    label_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+    created_by_id number
+    updated_by_id number
+  }
+
+  buyer_needs {
+    id string PK
+    user_id string
+    title string
+    detail string
+    by_property string
+    area string
+    price string
+    surface_yield string
+    age string
+    along_the_line string
+    frequently_walked_to_the_nearest_station integer
+    structure string[]
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  buyer_needs_station {
+    id string PK
+    buyer_need_id string
+    route string
+    station string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  emails {
+    id string PK
+    subject string
+    text string
+    property_id string
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  histories {
+    id string PK
+    email_id string
+    sending_destination_email_address string
+    or_not boolean
+    openings boolean
+    intention_to_purchase boolean
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+
+  access_users {
+    id string PK
+    email_id string
+    seller_user_id string
+    buyer_user_id string
+    properties_id string
+    open_flg boolean
+    view_flg boolean
+    intent_flg boolean
+    price string
+    comment string
+    intended_created_at timestamp
+    created_at timestamp
+    updated_at timestamp
+    deleted_at timestamp
+  }
+```

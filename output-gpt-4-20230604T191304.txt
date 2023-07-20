@@ -1,0 +1,162 @@
+model: gpt-4
+time: 0:00:43.443721
+question: import psycopg2
+from psycopg2 import DatabaseError, sql
+
+
+class PostgresClient:
+    def __init__(self, host: str, port: int, user: str, password: str, database: str):
+        try:
+            self.client = psycopg2.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                database=database,
+            )
+            self.cursor = self.client.cursor()
+            self.conn = self.client
+        except psycopg2.OperationalError as e:
+            raise ConnectionError("Could not establish a connection with the database") from e
+
+    def close(self):
+        self.client.close()
+
+    def select(self, table: str, conditions: dict):
+        try:
+            query = sql.SQL("SELECT * FROM {}").format(sql.Identifier(table))
+
+            if conditions:
+                condition_string = sql.SQL(" AND ").join(sql.SQL(f"{key} = %s") for key in conditions.keys())
+                query = sql.SQL("{} WHERE {}").format(query, condition_string)
+
+            self.cursor.execute(query, tuple(conditions.values()) if conditions else ())
+            result = self.cursor.fetchone()
+
+            if result is None:
+                return None
+
+            return result
+        except psycopg2.Error as e:
+            raise DatabaseError("An error occurred while selecting data from the database") from e
+
+    def insert(self, table: str, data: dict):
+        try:
+            str_data = {k: str(v) for k, v in data.items()}
+
+            query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                sql.Identifier(table), sql.SQL(", ").join(map(sql.Identifier, str_data.keys())), sql.SQL(", ").join(sql.Placeholder() * len(str_data))
+            )
+
+            self.cursor.execute(query, tuple(str_data.values()))
+            self.conn.commit()
+        except psycopg2.Error as e:
+            self.conn.rollback()
+            raise DatabaseError("An error occurred while inserting data into the database") from e
+
+    def delete(self, table: str, conditions: dict):
+        try:
+            condition_string = " AND ".join([f"{key} = %s" for key in conditions.keys()])
+            query = sql.SQL("DELETE FROM {} WHERE " + condition_string).format(sql.Identifier(table))
+
+            self.cursor.execute(query, tuple(conditions.values()))
+            self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            raise DatabaseError("An error occurred while deleting data from the database") from e
+        finally:
+            self.conn.commit()
+
+    def bulk_insert(self, table: str, data: list):
+        query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+            sql.Identifier(table), sql.SQL(", ").join(map(sql.Identifier, data[0].keys())), sql.SQL(", ").join(sql.Placeholder() * len(data[0]))
+        )
+
+        try:
+            self.cursor.executemany(query, [tuple(d.values()) for d in data])
+            self.conn.commit()
+        except psycopg2.Error as e:
+            self.conn.rollback()
+            raise DatabaseError("An error occurred while inserting data into the database") from e
+
+    def bulk_delete(self, table: str, conditions: dict):
+        condition_string = " AND ".join([f"{key} = %s" for key in conditions.keys()])
+        query = sql.SQL("DELETE FROM {} WHERE " + condition_string).format(sql.Identifier(table))
+
+        try:
+            self.cursor.execute(query, tuple(conditions.values()))
+            self.conn.commit()
+
+        except psycopg2.Error as e:
+            self.conn.rollback()
+            raise DatabaseError("An error occurred while deleting data from the database") from e
+
+    def delete(self, bot_id: str):
+        try:
+            bot = self.bot_service.find_by_id(bot_id)
+            if not self.bot_service.delete(bot):
+                raise ValueError("Bot not found.")
+            return JSONResponse(status_code=200, content={"message": "Bot deleted successfully."})
+        except Exception as e:
+            return JSONResponse(status_code=404, content={"error": str(e)})
+    def delete(self, bot: Bot):
+        conditions = {"id": bot.id}
+        return self.db_client.delete(self.table_name, conditions=conditions)
+
+
+{
+  "error": "Bot with id 845877b4-41c6-4b6b-9844-4256f1930c1b could not be deleted."
+}
+
+delete のみが、except にひっかからずに、エラーになってしまいます...
+修正してください。
+answer: class PostgresClient:
+    def __init__(self, host: str, port: int, user: str, password: str, database: str):
+        try:
+            self.client = psycopg2.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                database=database,
+            )
+            self.cursor = self.client.cursor()
+            self.conn = self.client
+        except psycopg2.OperationalError as e:
+            raise ConnectionError("Could not establish a connection with the database") from e
+
+    def close(self):
+        self.client.close()
+
+    # ...
+    # Other methods here: select, insert, bulk_insert, bulk_delete
+    # ...
+    
+    def delete(self, table: str, conditions: dict):
+        try:
+            condition_string = sql.SQL(" AND ").join(sql.SQL("{} = %s").format(sql.Identifier(k)) for k in conditions)
+            query = sql.SQL("DELETE FROM {} WHERE ").format(sql.Identifier(table)) + condition_string
+
+            self.cursor.execute(query, tuple(conditions.values()))
+            self.conn.commit()
+        except psycopg2.Error as e:
+            self.conn.rollback()
+            raise DatabaseError("An error occurred while deleting data from the database") from e
+
+    def delete_bot(self, bot_id: str):
+        try:
+            bot = self.bot_service.find_by_id(bot_id)
+            if not self.bot_service.delete(bot):
+                raise ValueError("Bot not found.")
+            return JSONResponse(status_code=200, content={"message": "Bot deleted successfully."})
+        except Exception as e:
+            return JSONResponse(status_code=404, content={"error": str(e)})
+        
+    def delete(self, bot: Bot):
+        conditions = {"id": bot.id}
+        return self.db_client.delete(self.table_name, conditions=conditions)
+
+
+{
+  "error": "Bot with id 845877b4-41c6-4b6b-9844-4256f1930c1b could not be deleted."
+}

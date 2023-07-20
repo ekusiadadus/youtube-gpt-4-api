@@ -1,0 +1,278 @@
+model: gpt-4
+time: 0:01:02.873933
+question: ```html 参考コード
+<div class="relative flex w-[calc(100%-50px)] flex-col gap-1 md:gap-3 lg:w-[calc(100%-115px)]"><div class="flex flex-grow flex-col gap-3"><div class="min-h-[20px] flex items-start overflow-x-auto whitespace-pre-wrap break-words flex-col gap-4"><div class="markdown prose w-full break-words dark:prose-invert light"><p>Hello! How can I assist you today?</p></div></div></div><div class="flex justify-between lg:block"><div class="text-gray-400 flex self-end lg:self-center justify-center mt-2 gap-2 md:gap-3 lg:gap-1 lg:absolute lg:top-0 lg:translate-x-full lg:right-0 lg:mt-0 lg:pl-2 visible"><button class="flex ml-auto gap-2 rounded-md p-1 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 disabled:dark:hover:text-gray-400"><svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg></button><div class="flex gap-1"><button class="p-1 rounded-md hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 disabled:dark:hover:text-gray-400"><svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg></button><button class="p-1 rounded-md hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 disabled:dark:hover:text-gray-400"><svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg></button></div></div></div></div>
+```
+
+```jsx
+import { Message } from "../domain/model/message";
+import { Typography } from "matsuri-ui";
+import { css } from "../../styled-system/css";
+import React, { useEffect, useRef, useState } from "react";
+
+const CSChatPage = () => {
+  const [messageText, setMessageText] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const ws = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (ws.current === null || ws.current.readyState === WebSocket.CLOSED) {
+      ws.current = new WebSocket(
+        import.meta.env.VITE_VERCEL_ENV === "production"
+          ? "wss://api-gpt.dev.m2msystems.cloud" + `/cs/chat`
+          : "wss://api-gpt.dev.m2msystems.cloud" + `/cs/chat`
+      );
+
+      ws.current.onmessage = function (event) {
+        const messageData = JSON.parse(event.data);
+
+        setMessages((prevMessages) => {
+          const existingMessageIndex = prevMessages.findIndex(
+            (msg) => msg.id === messageData.id && msg.author_type === "bot"
+          );
+          if (existingMessageIndex > -1) {
+            const newMessages = [...prevMessages];
+            newMessages[existingMessageIndex] = {
+              ...newMessages[existingMessageIndex],
+              text:
+                newMessages[existingMessageIndex].text + messageData.message,
+            };
+            return newMessages;
+          } else {
+            return [
+              ...prevMessages,
+              {
+                id: messageData.id,
+                chat_id: messageData.chat_id,
+                author_type: "bot",
+                message_type: "default",
+                text: messageData.message,
+                bot_id: messageData.bot_id,
+              },
+            ];
+          }
+        });
+      };
+    }
+  });
+
+  const sendMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (ws.current !== null && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(messageText);
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: "temp",
+          chat_id: "tempChatId",
+          author_type: "user",
+          message_type: "default",
+          text: messageText,
+          user_id: "tempUserId",
+        },
+      ]);
+      setMessageText("");
+    }
+  };
+
+  return (
+    <div
+      className={css({
+        borderRadius: "15px",
+        backgroundColor: "#FFFFFF",
+        padding: "20px",
+        margin: "0 auto",
+        boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+      })}
+    >
+      <h1>CS用Chat</h1>
+      <a
+        href="https://docs.google.com/spreadsheets/d/1yhgyGLIT_hDseRPshKCfnxeTPapmlLcA5Apr6tbU-6o/edit#gid=1281356584"
+        target="_blank"
+        rel="noreferrer"
+      >
+        スプレッドシート
+      </a>
+      <form onSubmit={sendMessage}>
+        <input
+          type="text"
+          value={messageText}
+          onChange={(e) => setMessageText(e.target.value)}
+          placeholder="Enter message"
+          required
+        />
+        <input type="submit" value="Send" />
+      </form>
+
+      <ul>
+        {messages.map((message) => (
+          <li
+            key={message.id}
+            className={css({
+              display: "flex",
+              justifyContent:
+                message.author_type === "bot" ? "flex-start" : "flex-end",
+              padding: "10px",
+              marginBottom: "10px",
+              borderRadius: "15px", // Round corners
+              backgroundColor:
+                message.author_type === "bot" ? "#f0f0f0" : "#e0f7fa",
+            })}
+          >
+            {message.author_type === "bot" && (
+              <img
+                src="/pptotoro.jpg"
+                alt="Bot"
+                style={{ width: "80%", maxWidth: "200px", maxHeight: "200px" }}
+              />
+            )}
+            {/* Adjust size */}
+            <Typography>
+              <budoux-ja>
+                {message.text.split("\n").map((line, index) => (
+                  <>
+                    <p key={index}>{line}</p>
+                    <br />
+                  </>
+                ))}
+              </budoux-ja>
+            </Typography>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default CSChatPage;
+```
+
+
+下のコードを 使っているライブラリを変更せずに、参考コードのようなCSSに修正して
+
+answer: ```jsx
+import { Message } from "../domain/model/message";
+import { Typography } from "matsuri-ui";
+import React, { useEffect, useRef, useState } from "react";
+
+const CSChatPage = () => {
+  const [messageText, setMessageText] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const ws = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (ws.current === null || ws.current.readyState === WebSocket.CLOSED) {
+      ws.current = new WebSocket(
+        import.meta.env.VITE_VERCEL_ENV === "production"
+          ? "wss://api-gpt.dev.m2msystems.cloud" + `/cs/chat`
+          : "wss://api-gpt.dev.m2msystems.cloud" + `/cs/chat`
+      );
+
+      ws.current.onmessage = function (event) {
+        const messageData = JSON.parse(event.data);
+
+        setMessages((prevMessages) => {
+          const existingMessageIndex = prevMessages.findIndex(
+            (msg) => msg.id === messageData.id && msg.author_type === "bot"
+          );
+          if (existingMessageIndex > -1) {
+            const newMessages = [...prevMessages];
+            newMessages[existingMessageIndex] = {
+              ...newMessages[existingMessageIndex],
+              text:
+                newMessages[existingMessageIndex].text + messageData.message,
+            };
+            return newMessages;
+          } else {
+            return [
+              ...prevMessages,
+              {
+                id: messageData.id,
+                chat_id: messageData.chat_id,
+                author_type: "bot",
+                message_type: "default",
+                text: messageData.message,
+                bot_id: messageData.bot_id,
+              },
+            ];
+          }
+        });
+      };
+    }
+  });
+
+  const sendMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (ws.current !== null && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(messageText);
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: "temp",
+          chat_id: "tempChatId",
+          author_type: "user",
+          message_type: "default",
+          text: messageText,
+          user_id: "tempUserId",
+        },
+      ]);
+      setMessageText("");
+    }
+  };
+
+  return (
+    <div
+      className="relative flex flex-col gap-1 md:gap-3 lg:w-[calc(100%-115px)]"
+    >
+      <h1>CS用Chat</h1>
+      <a
+        href="https://docs.google.com/spreadsheets/d/1yhgyGLIT_hDseRPshKCfnxeTPapmlLcA5Apr6tbU-6o/edit#gid=1281356584"
+        target="_blank"
+        rel="noreferrer"
+      >
+        スプレッドシート
+      </a>
+      <form onSubmit={sendMessage}>
+        <input
+          type="text"
+          value={messageText}
+          onChange={(e) => setMessageText(e.target.value)}
+          placeholder="Enter message"
+          required
+        />
+        <input type="submit" value="Send" />
+      </form>
+
+      <ul className="flex flex-grow flex-col gap-3 min-h-[20px] items-start overflow-x-auto whitespace-pre-wrap break-words flex-col gap-4">
+        {messages.map((message) => (
+          <li  
+            key={message.id}
+            className="markdown prose w-full break-words dark:prose-invert light"
+          >
+            {message.author_type === "bot" && (
+              <img
+                src="/pptotoro.jpg"
+                alt="Bot"
+                style={{ width: "80%", maxWidth: "200px", maxHeight: "200px" }}
+              />
+            )}
+            <Typography>
+              <budoux-ja>
+                {message.text.split("\n").map((line, index) => (
+                  <>
+                    <p key={index}>{line}</p>
+                    <br />
+                  </>
+                ))}
+              </budoux-ja>
+           </Typography>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default CSChatPage;
+```
+上記の例では、Tailwind CSSを使用して、参考コードのCSSを模倣しています。ただし、あなたのプロジェクトで使用している他のライブラリやスタイリング方法と衝突しないように注意してください。

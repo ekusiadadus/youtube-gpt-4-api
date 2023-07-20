@@ -1,0 +1,737 @@
+model: gpt-4
+time: 0:02:28.468724
+question: ```
+{
+    "board": [
+        [
+            {
+                "type": "Kyo",
+                "direction": "down"
+            },
+            {
+                "type": "Kei",
+                "direction": "down"
+            },
+            null,
+            {
+                "type": "Kin",
+                "direction": "down"
+            },
+            {
+                "type": "Ou",
+                "direction": "down"
+            },
+            null,
+            {
+                "type": "Gin",
+                "direction": "down"
+            },
+            {
+                "type": "Kei",
+                "direction": "down"
+            },
+            {
+                "type": "Kyo",
+                "direction": "down"
+            }
+        ],
+        [
+            null,
+            {
+                "type": "Hisha",
+                "direction": "down"
+            },
+            {
+                "type": "Gin",
+                "direction": "down"
+            },
+            null,
+            null,
+            null,
+            {
+                "type": "Kin",
+                "direction": "down"
+            },
+            {
+                "type": "Kaku",
+                "direction": "down"
+            },
+            null
+        ],
+        [
+            null,
+            null,
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            null
+        ],
+        [
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+                "type": "Fu",
+                "direction": "down"
+            }
+        ],
+        [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            null
+        ],
+        [
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+                "type": "Fu",
+                "direction": "up"
+            }
+        ],
+        [
+            null,
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            null,
+            null
+        ],
+        [
+            null,
+            {
+                "type": "Kaku",
+                "direction": "up"
+            },
+            {
+                "type": "Kin",
+                "direction": "up"
+            },
+            {
+                "type": "Gyoku",
+                "direction": "up"
+            },
+            null,
+            null,
+            {
+                "type": "Gin",
+                "direction": "up"
+            },
+            {
+                "type": "Hisha",
+                "direction": "up"
+            },
+            null
+        ],
+        [
+            {
+                "type": "Kyo",
+                "direction": "up"
+            },
+            {
+                "type": "Kei",
+                "direction": "up"
+            },
+            {
+                "type": "Gin",
+                "direction": "up"
+            },
+            null,
+            null,
+            {
+                "type": "Kin",
+                "direction": "up"
+            },
+            null,
+            {
+                "type": "Kei",
+                "direction": "up"
+            },
+            {
+                "type": "Kyo",
+                "direction": "up"
+            }
+        ]
+    ],
+    "upKomadai": {
+        "Fu": 0,
+        "Kyo": 0,
+        "Kei": 0,
+        "Gin": 0,
+        "Kin": 0,
+        "Kaku": 0,
+        "Hisha": 0,
+        "Gyoku": 0,
+        "Ou": 0,
+        "To": 0,
+        "Narikyo": 0,
+        "Narikei": 0,
+        "Narigin": 0,
+        "Uma": 0,
+        "Ryu": 0
+    },
+    "downKomadai": {
+        "Fu": 0,
+        "Kyo": 0,
+        "Kei": 0,
+        "Gin": 0,
+        "Kin": 0,
+        "Kaku": 0,
+        "Hisha": 0,
+        "Gyoku": 0,
+        "Ou": 0,
+        "To": 0,
+        "Narikyo": 0,
+        "Narikei": 0,
+        "Narigin": 0,
+        "Uma": 0,
+        "Ryu": 0
+    },
+    "turn": "up",
+    "selected": null,
+    "winner": null
+}
+```
+
+15 同　歩(87) (00:00/00:00:00)
+
+```
+{
+    "board": [
+        [
+            {
+                "type": "Kyo",
+                "direction": "down"
+            },
+            {
+                "type": "Kei",
+                "direction": "down"
+            },
+            null,
+            {
+                "type": "Kin",
+                "direction": "down"
+            },
+            {
+                "type": "Ou",
+                "direction": "down"
+            },
+            null,
+            {
+                "type": "Gin",
+                "direction": "down"
+            },
+            {
+                "type": "Kei",
+                "direction": "down"
+            },
+            {
+                "type": "Kyo",
+                "direction": "down"
+            }
+        ],
+        [
+            null,
+            {
+                "type": "Hisha",
+                "direction": "down"
+            },
+            {
+                "type": "Gin",
+                "direction": "down"
+            },
+            null,
+            null,
+            null,
+            {
+                "type": "Kin",
+                "direction": "down"
+            },
+            {
+                "type": "Kaku",
+                "direction": "down"
+            },
+            null
+        ],
+        [
+            null,
+            null,
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            null
+        ],
+        [
+            {
+                "type": "Fu",
+                "direction": "down"
+            },
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+                "type": "Fu",
+                "direction": "down"
+            }
+        ],
+        [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            null
+        ],
+        [
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+                "type": "Fu",
+                "direction": "up"
+            }
+        ],
+        [
+            null,
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            {
+                "type": "Fu",
+                "direction": "up"
+            },
+            null,
+            null
+        ],
+        [
+            null,
+            {
+                "type": "Kaku",
+                "direction": "up"
+            },
+            {
+                "type": "Kin",
+                "direction": "up"
+            },
+            {
+                "type": "Gyoku",
+                "direction": "up"
+            },
+            null,
+            null,
+            {
+                "type": "Gin",
+                "direction": "up"
+            },
+            {
+                "type": "Hisha",
+                "direction": "up"
+            },
+            null
+        ],
+        [
+            {
+                "type": "Kyo",
+                "direction": "up"
+            },
+            {
+                "type": "Kei",
+                "direction": "up"
+            },
+            {
+                "type": "Gin",
+                "direction": "up"
+            },
+            null,
+            null,
+            {
+                "type": "Kin",
+                "direction": "up"
+            },
+            null,
+            {
+                "type": "Kei",
+                "direction": "up"
+            },
+            {
+                "type": "Kyo",
+                "direction": "up"
+            }
+        ]
+    ],
+    "upKomadai": {
+        "Fu": 0,
+        "Kyo": 0,
+        "Kei": 0,
+        "Gin": 0,
+        "Kin": 0,
+        "Kaku": 0,
+        "Hisha": 0,
+        "Gyoku": 0,
+        "Ou": 0,
+        "To": 0,
+        "Narikyo": 0,
+        "Narikei": 0,
+        "Narigin": 0,
+        "Uma": 0,
+        "Ryu": 0
+    },
+    "downKomadai": {
+        "Fu": 1,
+        "Kyo": 0,
+        "Kei": 0,
+        "Gin": 0,
+        "Kin": 0,
+        "Kaku": 0,
+        "Hisha": 0,
+        "Gyoku": 0,
+        "Ou": 0,
+        "To": 0,
+        "Narikyo": 0,
+        "Narikei": 0,
+        "Narigin": 0,
+        "Uma": 0,
+        "Ryu": 0
+    },
+    "turn": "down",
+    "selected": null,
+    "winner": null
+}
+```
+
+
+
+```
+export const parseKIF = (KIF: string) => {
+  const boardHistory: BoardType[] = [initialBoard]
+  const lines = KIF.split(/\r?\n/)
+  let prevMove: { toX: number; toY: number } | null = null
+
+  lines.forEach((line, index) => {
+    line = num2num(line)
+    line = kanji2num(line)
+    line = zenkaku2hankaku(line)
+    line = multipleKuhaku2single(line)
+    // const matches = line.match(/(\d+) (同|(\d{2}))(\D+)(打)?\((\d{2})?\)/)
+    // const matches = line.match(/(\d+) (同|(\d{2}))\s*(\D+)(打)?\((\d{2})?\)/)
+
+    const matches = line.match(
+      /^((\d+) (同 |同　|同|\d{2})(玉|飛|龍|竜|角|馬|金|銀|成銀|全|桂|成桂|圭|香|成香|杏|歩|と)(打|成)?(\((\d{2})\))?)|(中断|投了|持将棋|千日手|切れ負け|反則勝ち|反則負け|入玉勝ち|不戦勝|不戦敗|詰み|不詰)$/
+    )
+
+    if (matches === null) {
+      throw new Error("Invalid KIF format")
+    }
+
+    const idx = parseInt(matches[1], 10)
+    const direction: "up" | "down" = idx % 2 === 1 ? "up" : "down"
+    const pieceType = Object.keys(PieceDisplay).find(
+      key => PieceDisplay[key as keyof typeof PieceDisplay] === matches[4]
+    ) as PieceType
+
+    let toX: number, toY: number
+    if (matches[3] === "同" || matches[3] === "同　" || matches[3] === "同 ") {
+      if (!prevMove) {
+        throw new Error("Invalid KIF format")
+      }
+      toX = prevMove.toX
+      toY = prevMove.toY
+    } else if (matches[5] === "打") {
+      toY = parseInt(matches[3].charAt(1), 10) - 1
+      toX = 9 - parseInt(matches[3].charAt(0), 10)
+    } else {
+      toY = parseInt(matches[3].charAt(1), 10) - 1
+      toX = 9 - parseInt(matches[3].charAt(0), 10)
+    }
+
+    let promote: boolean = false
+    if (matches[5] === "成") {
+      promote = true
+    }
+
+    let fromX: number | null, fromY: number | null
+
+    if (matches[5] === "打") {
+      fromX = null
+      fromY = null
+    } else if (matches[5] === "成") {
+      if (!matches[7]) {
+        throw new Error("Invalid KIF format")
+      }
+      fromY = parseInt(matches[7].charAt(1), 10) - 1
+      fromX = 9 - parseInt(matches[7].charAt(0), 10)
+    } else if (
+      matches[3] === "同" ||
+      matches[3] === "同　" ||
+      matches[3] === "同 "
+    ) {
+      if (!prevMove) {
+        throw new Error("Invalid KIF format")
+      }
+      fromX = prevMove.toX
+      fromY = prevMove.toY
+    } else {
+      if (!matches[3]) {
+        throw new Error("Invalid KIF format")
+      }
+      fromY = parseInt(matches[7].charAt(1), 10) - 1
+      fromX = 9 - parseInt(matches[7].charAt(0), 10)
+    }
+
+    const move = {
+      direction,
+      pieceType,
+      fromX,
+      fromY,
+      toX,
+      toY,
+      upKomadai: { ...boardHistory[boardHistory.length - 1].upKomadai },
+      downKomadai: { ...boardHistory[boardHistory.length - 1].downKomadai },
+      promote
+    }
+
+    prevMove = { toX, toY }
+
+    boardHistory.push(
+      updateBoardAndKomadai({
+        board: boardHistory[boardHistory.length - 1],
+        move
+      })
+    )
+  })
+
+  return boardHistory
+}
+```
+
+```
+import Game from "../components/Game/Game"
+
+export const GamePage = () => {
+  return (
+    <Game
+      KIF={`1 ２六歩(27) (00:00/00:00:00)
+2 ８四歩(83) (00:00/00:00:00)
+3 ２五歩(26) (00:00/00:00:00)
+4 ８五歩(84) (00:00/00:00:00)
+5 ７八金(69) (00:00/00:00:00)
+6 ３二金(41) (00:00/00:00:00)
+7 ３八銀(39) (00:00/00:00:00)
+8 ７二銀(71) (00:00/00:00:00)
+9 ９六歩(97) (00:00/00:00:00)
+10 １四歩(13) (00:00/00:00:00)
+11 １六歩(17) (00:00/00:00:00)
+12 ９四歩(93) (00:00/00:00:00)
+13 ６八玉(59) (00:00/00:00:00)
+14 ８六歩(85) (00:00/00:00:00)
+15 同　歩(87) (00:00/00:00:00)
+16 同　飛(82) (00:00/00:00:00)
+17 ８七歩打 (00:00/00:00:00)
+...
+```
+
+15 同　歩(87) (00:00/00:00:00)
+
+の処理が、↑のように駒の移動が間違って処理されています。
+コードを修正してください
+answer: 問題の箇所は、正規表現のマッチング後に位置情報を正しく処理するための条件分岐です。それぞれの分岐条件で、`toX` と `toY` の決定方法を修正しました。以下に修正されたコードを示します。
+
+```javascript
+lines.forEach((line, index) => {
+  // ... (その他の前処理は変更無し)
+  // const matches = line.match(/(\d+) (同|(\d{2}))\s*(\D+)(打)?\((\d{2})?\)/)
+
+  const matches = line.match(
+    /^((\d+) (同 |同　|同|\d{2})(玉|飛|龍|竜|角|馬|金|銀|成銀|全|桂|成桂|圭|香|成香|杏|歩|とう)(打|成)?(\((\d{2})\))?)|(中断|投了|持将棋|千日手|切れ負け|反則勝ち|反則負け|入玉勝ち|不戦勝|不戦敗|詰み|不詰)$/
+  )
+
+  if (matches === null) {
+    throw new Error("Invalid KIF format")
+  }
+
+  const idx = parseInt(matches[1], 10)
+  const direction: "up" | "down" = idx % 2 === 1 ? "up" : "down"
+  const pieceType = Object.keys(PieceDisplay).find(
+    key => PieceDisplay[key as keyof typeof PieceDisplay] === matches[4]
+  ) as PieceType
+
+  let toX: number, toY: number
+  if (matches[3] === "同" || matches[3] === "同　" || matches[3] === "同 ") {
+    if (!prevMove) {
+      throw new Error("Invalid KIF format")
+    }
+    toX = prevMove.toX
+    toY = prevMove.toY
+  } else {
+    toY = parseInt(matches[3].charAt(1), 10) - 1
+    toX = 9 - parseInt(matches[3].charAt(0), 10)
+  }
+
+  let promote: boolean = false
+  if (matches[5] === "成") {
+    promote = true
+  }
+
+  let fromX: number | null, fromY: number | null
+
+  if (matches[5] === "打") {
+    fromX = null
+    fromY = null
+  } else {
+    if (!matches[7]) {
+      throw new Error("Invalid KIF format")
+    }
+    fromY = parseInt(matches[7].charAt(1), 10) - 1
+    fromX = 9 - parseInt(matches[7].charAt(0), 10)
+  }
+
+  const move = {
+    direction,
+    pieceType,
+    fromX,
+    fromY,
+    toX,
+    toY,
+    upKomadai: { ...boardHistory[boardHistory.length - 1].upKomadai },
+    downKomadai: { ...boardHistory[boardHistory.length - 1].downKomadai },
+    promote
+  }
+
+  prevMove = { toX, toY }
+
+  boardHistory.push(
+    updateBoardAndKomadai({
+      board: boardHistory[boardHistory.length - 1],
+      move
+    })
+  )
+})
+```
+
+この修正により、15 同　歩(87) (00:00/00:00:00) のような手が正しく処理されるようになります。

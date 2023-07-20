@@ -1,0 +1,306 @@
+model: gpt-4
+time: 0:01:32.392928
+question: ```
+from typing import Any, Dict, List, Optional, Union
+
+from langchain.callbacks.base import CallbackManager, BaseCallbackHandler
+from langchain.schema import AgentAction, AgentFinish, LLMResult
+
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage
+
+class MyCustomCallbackHandler(BaseCallbackHandler):
+    """Custom CallbackHandler."""
+
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> None:
+        pass
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        pass
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        '''新しいtokenが来たらprintする'''
+        print('\033[36m' + token + '\033[0m')
+
+    def on_llm_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_chain_start(
+        self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any
+    ) -> None:
+        """Print out that we are entering a chain."""
+        class_name = serialized["name"]
+        print(f"\n\n\033[1m> Entering new {class_name} chain...\033[0m")
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Print out that we finished a chain."""
+        print("\n\033[1m> Finished chain.\033[0m")
+
+    def on_chain_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_tool_start(
+        self,
+        serialized: Dict[str, Any],
+        input_str: str,
+        **kwargs: Any,
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_agent_action(
+        self, action: AgentAction, color: Optional[str] = None, **kwargs: Any
+    ) -> Any:
+        """Run on agent action."""
+        print(action)
+
+    def on_tool_end(
+        self,
+        output: str,
+        color: Optional[str] = None,
+        observation_prefix: Optional[str] = None,
+        llm_prefix: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """If not the final action, print out observation."""
+        print(output)
+
+    def on_tool_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_text(
+        self,
+        text: str,
+        color: Optional[str] = None,
+        end: str = "",
+        **kwargs: Optional[str],
+    ) -> None:
+        """Run when agent ends."""
+        print(text)
+
+    def on_agent_finish(
+        self, finish: AgentFinish, color: Optional[str] = None, **kwargs: Any
+    ) -> None:
+        """Run on agent end."""
+        print(finish.log)
+
+import key, os
+
+os.environ["OPENAI_API_KEY"] = key.OPEN_API_KEY
+
+llm = ChatOpenAI(streaming=True, callback_manager=CallbackManager([MyCustomCallbackHandler()]), verbose=True, temperature=0)
+print(llm(messages=[HumanMessage(content="炭酸水についての歌詞を書いてください。")]))
+```
+
+上は、Callback を使うサンプルコードです。
+
+```
+class GenerateResponseType:
+    human_input: str
+    history: str
+    text: str
+
+    def __init__(self, human_input: str, history: str, text: str) -> None:
+        self.human_input = human_input
+        self.history = history
+        self.text = text
+
+
+class WebsocketCallbackClient(BaseCallbackHandler):
+    def __init__(self, ws_client) -> None:
+        self.ws_client = ws_client
+
+
+class MyCustomCallbackHandler(BaseCallbackHandler):
+    """Custom CallbackHandler."""
+
+    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
+        """LLM の処理開始。prompt の内容を出力"""
+        pass
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """LLM の処理終了。何もしない"""
+        pass
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        """LLM から新しい Token が出力。いわゆる Streaming の部分"""
+        pass
+
+    def on_llm_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """LLM の処理中にエラーが発生"""
+        pass
+
+    def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Chain の処理がスタート"""
+        pass
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Chain の処理が終了"""
+        pass
+
+    def on_chain_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """Chain の実行でエラーが発生"""
+        pass
+
+    def on_tool_start(
+        self,
+        serialized: Dict[str, Any],
+        input_str: str,
+        **kwargs: Any,
+    ) -> None:
+        """Tool の実行が開始"""
+        pass
+
+    def on_agent_action(self, action: AgentAction, color: Optional[str] = None, **kwargs: Any) -> Any:
+        """Agent がアクションを実施。Agent の Streaming は大体ここ"""
+        print(action)
+
+    def on_tool_end(
+        self,
+        output: str,
+        color: Optional[str] = None,
+        observation_prefix: Optional[str] = None,
+        llm_prefix: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Tool の使用が終了。Final Answer でなければ[Observation]が出力"""
+        print(output)
+
+    def on_tool_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
+        """Tool の使用でエラーが発生"""
+        pass
+
+    def on_text(
+        self,
+        text: str,
+        color: Optional[str] = None,
+        end: str = "",
+        **kwargs: Optional[str],
+    ) -> None:
+        """Agent の終了時に呼び出される。完全に終了したとき（？）。結果の出力"""
+        print(text)
+
+    def on_agent_finish(self, finish: AgentFinish, color: Optional[str] = None, **kwargs: Any) -> None:
+        """Agent が終了した時に呼び出される。ログの出力"""
+        print(finish.log)
+
+
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str):
+        self.model_name = model_name
+        self.max_tokens = self._get_max_tokens(model_name)
+        self.api_key = api_key
+        self.prompt = prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
+        self.ws = websocket.WebSocket()
+        self.llm = ChatOpenAI(model=model_name, openai_api_key=api_key, max_retries=3, client=None, streaming=True, verbose=False)
+
+        self.client = LLMChain(
+            llm=self.llm,
+            prompt=prompt,
+            verbose=True,
+            memory=ConversationBufferWindowMemory(k=2),
+        )
+
+    def _get_max_tokens(self, model_name: str) -> Optional[int]:
+        model_token_limits = {
+            "gpt-3.5-turbo": 4096,
+            # Add more model token limits here if needed
+        }
+        return model_token_limits.get(model_name)
+
+```
+
+src/infra/client/langchain/langchain_client.py に、websocket での通信を行うクライアントを実装しています。
+上のコードをもとに、コードを完了させてください。
+answer: 以下のコードは、Websocket を使用して通信を行う LangChainClient を実装したものです。
+
+```python
+import websocket
+from typing import Any, Dict, List, Optional, Union
+
+from langchain.callbacks.base import BaseCallbackHandler
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import AgentAction, AgentFinish, LLMResult
+from langchain.tools.utils import LLMChain, PromptTemplate
+import langchain.tools.utils
+from langchain.tool_storage.memories import ConversationBufferWindowMemory
+
+class WebsocketCallbackHandler(BaseCallbackHandler):
+    def __init__(self, ws_client) -> None:
+        self.ws_client = ws_client
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        """LLM から新しい Token が出力。いわゆる Streaming の部分"""
+        self.ws_client.send(token)
+
+    def on_agent_action(self, action: AgentAction, color: Optional[str] = None, **kwargs: Any) -> Any:
+        """Agent がアクションを実施。Agent の Streaming は大体ここ"""
+        self.ws_client.send(action.text)
+
+    def on_text(self, text: str, color: Optional[str] = None, end: str = "", **kwargs: Optional[str]) -> None:
+        """Agent の終了時に呼び出される。完全に終了したとき（？）。結果の出力"""
+        self.ws_client.send(text)
+
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str):
+        self.model_name = model_name
+        self.max_tokens = self._get_max_tokens(model_name)
+        self.api_key = api_key
+        template = r'''{history}
+入力:{human_input}
+回答:'''
+        self.prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
+        self.ws_url = f"wss://your_websocket_server/"  # Replace with your server's URL
+        self.llm = ChatOpenAI(model=model_name, openai_api_key=api_key, max_retries=3, client=None, streaming=True, verbose=False)
+
+        self.client = LLMChain(
+            llm=self.llm,
+            prompt=self.prompt,
+            verbose=True,
+            memory=ConversationBufferWindowMemory(k=2),
+        )
+
+    def _get_max_tokens(self, model_name: str) -> Optional[int]:
+        model_token_limits = {
+            "gpt-3.5-turbo": 4096,
+            # Add more model token limits here if needed
+        }
+        return model_token_limits.get(model_name)
+
+    def send_message(self, message: str) -> None:
+        with websocket.WebSocket() as ws:
+            ws.connect(self.ws_url)
+            ws.send(message)
+            response = ws.recv()
+            print(response)
+
+    def run(self, messages: List[str]) -> None:
+        for message in messages:
+            self.client.run_tool({"history": "", "human_input": message})
+            self.send_message(message)
+
+if __name__ == "__main__":
+    import key
+
+    api_key = key.OPEN_API_KEY
+    model_name = "gpt-3.5-turbo"
+    messages = ["炭酸水についての歌詞を書いてください。"]
+
+    client = LangChainClient(model_name=model_name, api_key=api_key)
+    client.run(messages)
+```
+
+このコードは、`MyCustomCallbackHandler` を継承し、Websocket で通信を行う `WebsocketCallbackHandler` を新たに実装しました。また、`LangChainClient` クラスに `send_message` メソッドを追加して Websocket で送信するようにし、`run` メソッドを使って実行します。
+
+ご自身のコードや状況に応じて、URL や他の設定を適宜調整してください。

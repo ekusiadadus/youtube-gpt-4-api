@@ -1,0 +1,194 @@
+model: gpt-4
+time: 0:02:12.366355
+question: 
+
+```python
+import json
+from typing import List
+import os
+import json
+import logging
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+env = os.environ["ENV"]
+
+
+def handler(event, context):
+    print('received event:')
+    print(event)
+
+    return {
+        'statusCode': 200,
+        'headers': {
+            'Access-Control-Allow-Headers': '*',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+        },
+        'body': json.dumps('Hello from your new Amplify Python lambda!')
+    }
+
+```
+
+```yaml
+  UserTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: company_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName:
+            Fn::Join:
+              - "-"
+              - - CompanyIdIndex
+                - Ref: env
+          KeySchema:
+            - AttributeName: company_id
+              KeyType: HASH
+            - AttributeName: user_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+      TableName:
+        Fn::Join:
+          - _
+          - - user
+            - Ref: env
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+```
+
+amplify で作成した lambda 関数のコードです。
+このコードで、フロントエンドから入力されたユーザーIDを受け取りユーザーの作成を行いたいです。
+具体的には、DynamoDBにユーザーIDを保存する処理を行いたいです。
+
+最適なコードを作成してください
+
+answer: まず、以下のパッケージをインポートしましょう。
+
+```python
+import boto3
+from botocore.exceptions import ClientError
+```
+
+そして、以下のようにしてDynamoDBにアクセスするためのクライアントを作成します。
+
+```python
+dynamodb = boto3.resource("dynamodb")
+```
+
+Lambda関数では、`event`変数を使って入力されたデータを受け取ります。ユーザーIDを受け取るためには、以下のようにevent変数からユーザーIDを取得します。
+
+```python
+user_id = event["user_id"]
+company_id = event["company_id"]
+```
+
+次にDynamoDBのテーブル名を環境変数`UserTable`から取得し、テーブルのオブジェクトを作成します。
+
+```python
+table_name = os.environ["UserTable"]
+table = dynamodb.Table(table_name)
+```
+
+テーブルオブジェクトを使って、ユーザーIDを保存する処理を行います。
+
+```python
+try:
+    response = table.put_item(
+        Item={
+            "user_id": user_id,
+            "company_id": company_id,
+        }
+    )
+except ClientError as e:
+    logger.error(e.response["Error"]["Message"])
+    return {
+        "statusCode": 500,
+        "headers": {
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+        },
+        "body": json.dumps({"error": "Error in saving user to DynamoDB"}),
+    }
+else:
+    return {
+        "statusCode": 200,
+        "headers": {
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+        },
+        "body": json.dumps("User saved successfully in DynamoDB!"),
+    }
+```
+
+最終的なLambda関数のコードは以下のようになります。
+
+```python
+import boto3
+from botocore.exceptions import ClientError
+import json
+import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+env = os.environ["ENV"]
+dynamodb = boto3.resource("dynamodb")
+
+def handler(event, context):
+    print("received event:")
+    print(event)
+
+    user_id = event["user_id"]
+    company_id = event["company_id"]
+
+    table_name = os.environ["UserTable"]
+    table = dynamodb.Table(table_name)
+
+    try:
+        response = table.put_item(
+            Item={
+                "user_id": user_id,
+                "company_id": company_id,
+            }
+        )
+    except ClientError as e:
+        logger.error(e.response["Error"]["Message"])
+        return {
+            "statusCode": 500,
+            "headers": {
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+            },
+            "body": json.dumps({"error": "Error in saving user to DynamoDB"}),
+        }
+    else:
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+            },
+            "body": json.dumps("User saved successfully in DynamoDB!"),
+        }
+```
+
+これで、フロントエンドから送られてきたユーザーIDと会社IDを受け取り、DynamoDBに保存するLambda関数が完成しました。

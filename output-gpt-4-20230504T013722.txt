@@ -1,0 +1,240 @@
+model: gpt-4
+time: 0:02:14.404027
+question: 
+
+use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::fs;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Env {
+    local: String,
+    dev: String,
+    prod: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiInfo {
+    path: String,
+    desc: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ApiVer {
+    env: Env,
+    api: HashMap<String, ApiInfo>,
+}
+
+type ApiResponse = HashMap<String, ApiVer>;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiServer {
+    url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiOperation {
+    summary: String,
+    operationId: String,
+    tags: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiPath {
+    #[serde(flatten)]
+    operations: HashMap<String, OpenApiOperation>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiPaths {
+    #[serde(flatten)]
+    paths: HashMap<String, OpenApiPath>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiInfo {
+    title: String,
+    version: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiData {
+    openapi: String,
+    info: OpenApiInfo,
+    servers: Vec<OpenApiServer>,
+    paths: OpenApiPaths,
+}
+
+fn json_to_openapi(json_str: &str) -> Result<OpenApiData, serde_json::Error> {
+    let response: ApiResponse = serde_json::from_str(json_str)?;
+
+    let mut servers = Vec::new();
+    let binding = "".to_string();
+    let dev_url = response
+        .iter()
+        .next()
+        .map(|(_, api)| &api.env.dev)
+        .unwrap_or(&binding);
+    let binding = "".to_string();
+    let prod_url = response
+        .iter()
+        .next()
+        .map(|(_, api)| &api.env.prod)
+        .unwrap_or(&binding);
+    servers.push(OpenApiServer {
+        url: dev_url.to_string(),
+    });
+    servers.push(OpenApiServer {
+        url: prod_url.to_string(),
+    });
+
+    let mut openapi_paths: HashMap<String, OpenApiPath> = HashMap::new();
+    for (api_version, api_ver_info) in response {
+        for (api_name, api_info) in &api_ver_info.api {
+            let operation = OpenApiOperation {
+                summary: api_info.desc.to_string(),
+                operationId: format!("{}_{}", api_version, api_name),
+                tags: vec![api_version.to_string()],
+            };
+            let method = "get".to_string(); // ここでは、すべてのAPI呼び出しに 'get' メソッドを使用します。
+            let path_operations = vec![(method, operation)].into_iter().collect();
+            let api_path = OpenApiPath {
+                operations: path_operations,
+            };
+            openapi_paths.insert(api_info.path.to_string(), api_path);
+        }
+    }
+
+    let info = OpenApiInfo {
+        // title today as yyyy.mm.dd + "-m2m-cleaning"
+        title: format!("{}-m2m-cleaning", chrono::Local::now().format("%Y.%m.%d")),
+        // version set today as yyyy.mm.dd
+        version: chrono::Local::now().format("%Y.%m.%d").to_string(),
+    };
+
+    let openapi_data = OpenApiData {
+        openapi: "3.0.0".to_string(),
+        info,
+        servers,
+        paths: OpenApiPaths {
+            paths: openapi_paths,
+        },
+    };
+
+    Ok(openapi_data)
+}
+
+fn main() {
+    let json_str = r#"{json}"#;
+    let openapi_data = match json_to_openapi(json_str) {
+        Ok(data) => data,
+        Err(e) => panic!("Error converting JSON to OpenAPI: {:?}", e),
+    };
+
+    let openapi_yaml_str = serde_yaml::to_string(&openapi_data).unwrap();
+    fs::write("openapi.yaml", openapi_yaml_str).expect("Unable to write YAML file");
+
+    let openapi_json_str = serde_json::to_string_pretty(&openapi_data).unwrap();
+    fs::write("openapi.json", openapi_json_str).expect("Unable to write JSON file");
+}
+
+このコードは大変素晴らしく動きました。
+しかし、OpenAPI形式でPostmanに取り込む際に {{JWT}} という文字列を Bearer トークンとして要求したいです。
+これはどのように実現できますか？
+
+
+answer: PostmanでBearerトークンとして{{JWT}}を使用するには、OpenAPI形式でそれを定義する必要があります。これを行うには、`components`セクションを`OpenApiData`構造体に追加し、`securitySchemes`と`security`を使って{{JWT}}を設定します。以下の手順に従ってコードを更新してください。
+
+1. `OpenApiData`構造体に`OpenApiComponents`のフィールドを追加します。
+
+```rust
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiData {
+    openapi: String,
+    info: OpenApiInfo,
+    servers: Vec<OpenApiServer>,
+    paths: OpenApiPaths,
+    components: OpenApiComponents,
+}
+```
+
+2. `OpenApiComponents`と`OpenApiSecurityScheme`構造体を追加します。
+
+```rust
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiComponents {
+    securitySchemes: HashMap<String, OpenApiSecurityScheme>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiSecurityScheme {
+    #[serde(rename = "type")]
+    type_: String,
+    scheme: String,
+    bearerFormat: String,
+}
+```
+
+3. 各APIにセキュリティ要件を表す`security`フィールドを追加します。これには、`OpenApiRequirements`構造体を作成します。
+
+```rust
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiOperation {
+    summary: String,
+    operationId: String,
+    tags: Vec<String>,
+    security: Vec<OpenApiRequirements>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OpenApiRequirements {
+    #[serde(flatten)]
+    requirements: HashMap<String, Vec<String>>,
+}
+```
+
+4. `json_to_openapi`関数で`components`と`security`を設定します。
+
+```rust
+...
+[path]
+        let operation = OpenApiOperation {
+            summary: ... ,
+            operationId: ... ,
+            tags: ... ,
+            security: vec![OpenApiRequirements {
+                requirements: vec![("BearerAuth".to_owned(), vec![])].into_iter().collect(),
+            }],
+        };
+    }
+
+    let security_schemes: HashMap<String, OpenApiSecurityScheme> = vec![(
+        "BearerAuth".to_owned(),
+        OpenApiSecurityScheme {
+            type_: "http".to_owned(),
+            scheme: "bearer".to_owned(),
+            bearerFormat: "{{JWT}}".to_owned(),
+        },
+    )]
+    .into_iter()
+    .collect();
+
+    let components = OpenApiComponents {
+        securitySchemes,
+    };
+...
+
+    let openapi_data = OpenApiData {
+        openapi: ... ,
+        info: ... ,
+        servers: ... ,
+        paths: ... ,
+        components,
+    };
+
+...)
+```
+
+これで、生成された`openapi.yaml`ファイルと`openapi.json`ファイルに{{JWT}}としてBearerトークンが含まれるようになり、Postmanで適切に表示されます。

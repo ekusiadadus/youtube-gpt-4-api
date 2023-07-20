@@ -1,0 +1,113 @@
+model: gpt-4
+time: 0:01:46.335854
+question: ```
+from typing import Optional
+
+from langchain import LLMChain, PromptTemplate
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferWindowMemory
+
+template = """Assistant is a large language model trained by OpenAI.
+
+Assistant is designed to be able to assist with a wide range of tasks, from answering simple questions to providing in-depth explanations and discussions on a wide range of topics. As a language model, Assistant is able to generate human-like text based on the input it receives, allowing it to engage in natural-sounding conversations and provide responses that are coherent and relevant to the topic at hand.
+
+Assistant is constantly learning and improving, and its capabilities are constantly evolving. It is able to process and understand large amounts of text, and can use this knowledge to provide accurate and informative responses to a wide range of questions. Additionally, Assistant is able to generate its own text based on the input it receives, allowing it to engage in discussions and provide explanations and descriptions on a wide range of topics.
+
+Overall, Assistant is a powerful tool that can help with a wide range of tasks and provide valuable insights and information on a wide range of topics. Whether you need help with a specific question or just want to have a conversation about a particular topic, Assistant is here to assist.
+
+{history}
+Human: {human_input}
+Assistant:"""
+
+
+class GenerateResponseType:
+    human_input: str
+    history: str
+    text: str
+
+    def __init__(self, human_input: str, history: str, text: str) -> None:
+        self.human_input = human_input
+        self.history = history
+        self.text = text
+
+
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str):
+        self.model_name = model_name
+        self.max_tokens = self._get_max_tokens(model_name)
+        self.api_key = api_key
+        self.prompt = prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
+
+        self.llm = LLMChain(
+            llm=ChatOpenAI(model=model_name, openai_api_key=api_key, client=None, streaming=True),
+            prompt=prompt,
+            verbose=True,
+            memory=ConversationBufferWindowMemory(k=2),
+        )
+
+    def _get_max_tokens(self, model_name: str) -> Optional[int]:
+        model_token_limits = {
+            "gpt-3.5-turbo": 4096,
+            # Add more model token limits here if needed
+        }
+        return model_token_limits.get(model_name)
+
+    def generate_response(self, question: str, max_tokens: Optional[int] = None, temperature: float = 0.7, n: int = 1) -> str:
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        response = self.llm(question)
+        res = GenerateResponseType(**response)
+
+        return res.text
+
+```
+
+
+上で、ストリームでservice, handler側に返却したいです。
+ステップバイステップでコードの修正方法を教えてください。
+answer: まず、次の手順でコードを修正します。
+
+1. 関数 `generate_response` に `async` キーワードを追加して、非同期関数に変更します。
+2. `self.llm` の `ChatOpenAI` インスタンス生成時に `streaming` 引数を削除します。`streaming=True` ではなく、デフォルトの `streaming=False` になるようにします。
+3. `generate_response` 関数内で `llm` の代わりに `llm.stream` を使うように変更し、レスポンスをストリーミングするようにします。
+4. streamイテレータから値を取得するために、新しい `async for` ループを使用します。
+
+修正後のコードは次の通りです。
+
+```python
+from typing import Optional
+
+from langchain import LLMChain, PromptTemplate
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferWindowMemory
+
+# templateは同じまま
+
+class LangChainClient:
+    # __init__ は変更なし
+    def __init__(self, model_name: str, api_key: str):
+        # 省略（変更なし）
+
+    # _get_max_tokens は変更なし
+    def _get_max_tokens(self, model_name: str) -> Optional[int]:
+        # 省略（変更なし）
+
+    async def generate_response(self, question: str, max_tokens: Optional[int] = None, temperature: float = 0.7, n: int = 1) -> str:
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        # 非同期ストリームイテレータを取得
+        response_stream = self.llm.stream(question)
+
+        response_text = ""
+
+        # 非同期ストリーミングレスポンスを読み取る
+        async for response_chunk in response_stream:
+            res = GenerateResponseType(**response_chunk)
+            response_text += res.text
+
+        return response_text
+```
+
+この修正後のコードでは、`generate_response` 関数が非同期ストリーミングレスポンスを扱うようになっていますので、serviceやhandler側も非同期対応が必要です。例えば、FastAPI (https://fastapi.tiangolo.com/) のようなアシンクロナスフレームワークを利用することで、効率的かつ簡単に非同期エンドポイントを作成できます。

@@ -1,0 +1,60 @@
+model: gpt-4
+time: 0:00:41.937050
+question: python で websocket のように非同期に文字列が返ってくる処理があって、ある関数内でその文字を同様にして返すような関数を作りたいです。
+
+サンプルコードを書いてください。
+answer: PythonでWebSocketを使うためには、`websockets`ライブラリが必要です。以下のコマンドでインストールしてください：
+
+```
+pip install websockets
+```
+
+以下は、WebSocketで非同期に文字列を送受信するサンプルコードです。
+
+サーバーサイドのコード（`server.py`）：
+```python
+import asyncio
+import websockets
+
+async def echo(websocket, path):
+    async for message in websocket:
+        await websocket.send(f"I got your message: {message}")
+
+start_server = websockets.serve(echo, "localhost", 8765)
+
+asyncio.get_event_loop().run_until_complete(start_server)
+asyncio.get_event_loop().run_forever()
+```
+
+クライアントサイドのコード（`client.py`）：
+```python
+import asyncio
+import websockets
+
+async def communicate(message):
+    uri = "ws://localhost:8765"
+    async with websockets.connect(uri) as websocket:
+        await websocket.send(message)
+
+        response = await websocket.recv()
+        return response
+
+async def main():
+    message = input("What is your message? ")
+    response = await communicate(message)
+    print(response)
+
+asyncio.get_event_loop().run_until_complete(main())
+```
+
+サーバーを実行するには、`server.py`を実行してください：
+```
+python server.py
+```
+
+別のターミナルでクライアントを実行するには、 `client.py`を実行してください：
+```
+python client.py
+```
+
+これでWebSocketを使って非同期に文字列を送受信できるようになりました。

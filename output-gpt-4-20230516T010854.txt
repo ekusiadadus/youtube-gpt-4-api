@@ -1,0 +1,318 @@
+model: gpt-4
+time: 0:01:11.639182
+question: 
+
+```
+import time
+from botocore.exceptions import ClientError
+import json
+import os
+import logging
+
+
+try:
+    from repository import UserClient
+    from models import User
+except Exception:
+    import sys
+
+    sys.path.append("amplify/backend/function/kittbackenddevUtilLayer/lib/python")
+    from repository import UserClient
+    from models import User
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+env = os.environ["ENV"]
+
+ERROR_USER_NOT_FOUND = "user not found"
+ERROR_UPDATE_USER = "Error in updating user to DynamoDB"
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+}
+
+
+def handle_error(status_code, error_message):
+    '''
+    Create and return an error response with the given status code
+    and error message.
+
+    Args:
+        status_code (int): The HTTP status code for the error.
+        error_message (str): The error message to include in the response.
+
+    Returns:
+        dict: A dictionary with the error response structure.
+    '''
+    return {
+        "statusCode": status_code,
+        "headers": CORS_HEADERS,
+        "body": json.dumps({"error": error_message}),
+    }
+
+
+def handler(event, context):
+    print("received event:")
+    print(event)
+
+    http_method = event["requestContext"]["http"]["method"]
+
+    if http_method == "GET":
+        return get_user(event)
+    elif http_method == "POST":
+        return create_user(event)
+    elif http_method == "PUT":
+        return update_user(event)
+    elif http_method == "DELETE":
+        return delete_user(event)
+    else:
+        return {"statusCode": 400, "body": json.dumps("Invalid method")}
+
+
+def create_user(event):
+    input_data = json.loads(event["body"])
+
+    user_id = input_data["user_id"]
+    company_id = input_data["company_id"]
+
+    now = int(time.time())
+
+    # Create a UserTableBase object with the provided data
+    user_data = User(
+        user_id=user_id, company_id=company_id, created_at=now, updated_at=now
+    )
+
+    # Initialize a UserTableClient object
+    user_table_client = UserClient(env=env)
+
+    user = user_table_client.get(user_id=user_id, company_id=company_id)
+
+    if user:
+        return {
+            "statusCode": 400,
+            "headers": {
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST",
+            },
+            "body": json.dumps({"error": "User already exists"}),
+        }
+
+    try:
+        # Use the put method from the UserTableClient to store the user data
+        user_table_client.create(user=user_data)
+    except ClientError as e:
+        logger.error(e.response["Error"]["Message"])
+        return {
+            "statusCode": 500,
+            "headers": {
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+            },
+            "body": json.dumps({"error": "Error in saving user to DynamoDB"}),
+        }
+    else:
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+            },
+            "body": json.dumps("User saved successfully in DynamoDB!"),
+        }
+
+
+def get_user(event):
+    '''
+    Get user data with the provided user_id and company_id.
+    Return the user data with the provided user_id and company_id,
+    or return an error if the user is not found.
+
+    Args:
+        event (dict): An event object containing request information.
+
+    Returns:
+        dict: A JSON response object containing the user's information, or
+            an error if the user is not found.
+    '''
+
+    path_parameters = event["pathParameters"]
+    user_id = path_parameters["user_id"]
+    company_id = path_parameters["company_id"]
+
+    user_table_client = UserClient(env=env)
+
+    # Retrieve the requested user with the provided user_id and company_id
+    user = user_table_client.get(user_id=user_id, company_id=company_id)
+
+    if user is None:
+        logger.error(ERROR_USER_NOT_FOUND)
+        return handle_error(404, ERROR_USER_NOT_FOUND)
+
+    return {
+        "statusCode": 200,
+        "headers": CORS_HEADERS,
+        "body": json.dumps({"user": user.to_dict()}),
+    }
+
+
+def update_user(event):
+    input_data = json.loads(event["body"])
+
+    user_id = input_data["user_id"]
+    company_id = input_data["company_id"]
+    family_name = input_data["family_name"]
+    given_name = input_data["given_name"]
+    email = input_data["email"]
+
+    user_table_client = UserClient(env=env)
+
+    user = user_table_client.get(user_id=user_id, company_id=company_id)
+
+    if user is None:
+        logger.error(ERROR_USER_NOT_FOUND)
+        return handle_error(404, ERROR_USER_NOT_FOUND)
+
+    user = User(
+        user_id=user_id,
+        company_id=company_id,
+        family_name=family_name,
+        given_name=given_name,
+        email=email,
+        created_at=user.created_at,
+        updated_at=int(time.time()),
+    )
+
+    try:
+        user_table_client.update(user=user)
+    except ClientError as e:
+        logger.error(e.response["Error"]["Message"])
+        return handle_error(500, ERROR_UPDATE_USER)
+
+    return {
+        "statusCode": 200,
+        "headers": CORS_HEADERS,
+        "body": json.dumps({"user": user.to_dict()}),
+    }
+
+
+def delete_user(event):
+    '''
+    Delete a user with the provided user_id and company_id.
+    Deletes the user if found, else returns an error if the user not found.
+
+    Args:
+        event (dict): An event object containing request information.
+
+    Returns:
+        dict: A JSON response object containing a success message if
+            the user information is deleted, or an error if the user
+            is not found.
+    '''
+
+    path_parameters = event["pathParameters"]
+    user_id = path_parameters["user_id"]
+    company_id = path_parameters["company_id"]
+
+    user_table_client = UserClient(env=env)
+
+    # Retrieve the requested user with the provided user_id and company_id
+    user = user_table_client.get(user_id=user_id, company_id=company_id)
+
+    if user is None:
+        logger.error(ERROR_USER_NOT_FOUND)
+        return handle_error(404, ERROR_USER_NOT_FOUND)
+
+    try:
+        user_table_client.delete(user_id=user_id, company_id=company_id)
+    except ClientError as e:
+        logger.error(e.response["Error"]["Message"])
+        return handle_error(500, ERROR_UPDATE_USER)
+
+    return {
+        "statusCode": 200,
+        "headers": CORS_HEADERS,
+        "body": json.dumps({"message": "User deleted successfully"}),
+    }
+
+```
+
+上は、AWS Amplify CLI で作成したLambda関数のコードです。
+event.json を使ってローカルでテストしたいです。
+適切なevent.jsonを生成してください。
+
+
+
+answer: 以下は、AWS Lambda関数のテストに使用できる様々なシナリオのevent.json ファイルです。
+
+1. `create_user` をテストするための event.json：
+
+```json
+{
+  "requestContext": {
+    "http": {
+      "method": "POST"
+    }
+  },
+  "body": {
+    "user_id": "123456",
+    "company_id": "companyid1"
+  }
+}
+```
+
+2. `get_user` をテストするための event.json：
+
+```json
+{
+  "requestContext": {
+    "http": {
+      "method": "GET"
+    }
+  },
+  "pathParameters": {
+    "user_id": "123456",
+    "company_id": "companyid1"
+  }
+}
+```
+
+3. `update_user` をテストするための event.json：
+
+```json
+{
+  "requestContext": {
+    "http": {
+      "method": "PUT"
+    }
+  },
+  "body": {
+    "user_id": "123456",
+    "company_id": "companyid1",
+    "family_name": "New Family Name",
+    "given_name": "New Given Name",
+    "email": "newemail@example.com"
+  }
+}
+```
+
+4. `delete_user` をテストするための event.json：
+
+```json
+{
+  "requestContext": {
+    "http": {
+      "method": "DELETE"
+    }
+  },
+  "pathParameters": {
+    "user_id": "123456",
+    "company_id": "companyid1"
+  }
+}
+```

@@ -1,0 +1,377 @@
+model: gpt-4
+time: 0:02:32.212154
+question: import React, { useEffect, useRef, useState } from "react"
+import "./index.css"
+import type { ChatType } from "types/chat"
+
+const ChatForm = ({
+  companyID,
+  botID
+}: {
+  companyID: string
+  botID: string
+}) => {
+  const [inputText, setInputText] = useState<ChatType>({ type: "loading" })
+  const [chatTexts, setChatTexts] = useState<ChatType[]>([])
+  const endpointURLBase: string = import.meta.env.VITE_WEBSOCKET_ENDPOINT
+  const endpointURL: string =
+    botID && companyID
+      ? endpointURLBase +
+        "?" +
+        "bot_id=" +
+        botID +
+        "&" +
+        "company_id=" +
+        companyID
+      : endpointURLBase
+  const [isClickedSend, setIsClickedSend] = useState<boolean>(false)
+  const chatTextsElement = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (chatTextsElement.current) {
+      chatTextsElement.current.scrollTop = chatTextsElement.current.scrollHeight
+    }
+  }, [chatTexts])
+
+  const onClickSend = async () => {
+    if (isClickedSend) {
+      return
+    }
+    chatTextsElement?.current?.scrollTo(
+      0,
+      chatTextsElement.current.scrollHeight
+    )
+    // const chatTextsElement = document.getElementById("chat_texts")
+    setIsClickedSend(true)
+    const text = inputText
+    const storeChatTexts = [...chatTexts, text, { type: "loading" }]
+    setChatTexts(storeChatTexts)
+    setInputText({ type: "loading" })
+
+    const connection = new WebSocket(endpointURL)
+
+    connection.onopen = function () {
+      connection.send(
+        JSON.stringify({
+          action: "sendmessage",
+          company_id: companyID,
+          user_id: companyID,
+          bot_id: botID,
+          history: chatTexts.map((setChatText, index) => {
+            if (index % 2 === 0) {
+              return {
+                type: "human",
+                message: setChatText.message ?? ""
+              }
+            } else {
+              return {
+                type: "ai",
+                message: setChatText.message ?? ""
+              }
+            }
+          }),
+          user_input: text.message
+        })
+      )
+    }
+
+    let responseText: ChatType = {
+      type: ""
+    }
+
+    connection.onmessage = function (event: MessageEvent) {
+      const eventData: ChatType = JSON.parse(event.data)
+      if (eventData.type === "msg") {
+        responseText = {
+          type: eventData.type,
+          message: (responseText?.message ?? "") + (eventData.message ?? "")
+        }
+      } else if (eventData.type === "end") {
+        responseText = {
+          ...responseText,
+          documents: eventData.documents
+        }
+      }
+
+      const newChatTexts = [...chatTexts, text]
+      setChatTexts([...newChatTexts, responseText])
+    }
+
+    connection.onclose = function () {
+      setIsClickedSend(false)
+    }
+  }
+
+  return (
+    <div className="chat-container">
+      <div className="chat-header">
+        <div className="chat-header-title">
+          <h1>SpiralBot</h1>
+          <span>{botID}</span>
+        </div>
+      </div>
+      <div className="chat-message-container" ref={chatTextsElement}>
+        <div className="chat-message">
+          <div className="chat-message-content">
+            <p>
+              <div key={0} className="chat-bot-message-container">
+                <div className="chat-bot-message">
+                  はじめまして、私はSpiralBotです！
+                </div>
+              </div>
+              {chatTexts.map((chatText, index) => {
+                return (
+                  <ChatMessage key={index} chatText={chatText} index={index} />
+                )
+              })}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="chat-input-container">
+        <form className="chat-input-form">
+          <input
+            type="text"
+            className="chat-input"
+            placeholder="Type a message..."
+            onChange={e => {
+              setInputText({
+                message: e.target.value,
+                type: "human"
+              })
+            }}
+            value={inputText.message}
+          />
+          <button
+            type="submit"
+            className="chat-btn-send"
+            onClick={e => {
+              e.preventDefault()
+              console.log("Send")
+              void onClickSend()
+              setInputText({
+                message: "",
+                type: "human"
+              })
+            }}
+            disabled={inputText.message === ""}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 512 512"
+              className="chat-btn-send-icon"
+            >
+              <path d="M476 3.2L12.5 270.6c-18.1 10.4-15.8 35.6 2.2 43.2L121 358.4l287.3-253.2c5.5-4.9 13.3 2.6 8.6 8.3L176 407v80.5c0 23.6 28.5 32.9 42.5 15.8L282 426l124.6 52.2c14.2 6 30.4-2.9 33-18.2l72-432C515 7.8 493.3-6.8 476 3.2z"></path>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export const EmbeddedChat = ({
+  botID,
+  companyID
+}: {
+  botID: string
+  companyID: string
+}) => {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: "20px",
+        right: "20px"
+      }}
+    >
+      {open && <ChatForm botID={botID} companyID={companyID} />}
+      <a
+        id={botID}
+        className="floating-button"
+        onClick={() => {
+          setOpen(prev => !prev)
+        }}
+      >
+        {open ? (
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            data-prefix="fas"
+            data-icon="xmark"
+            className="svg-inline--fa fa-xmark"
+            role="img"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 384 512"
+          >
+            <path
+              fill="currentColor"
+              d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"
+            ></path>
+          </svg>
+        ) : (
+          <svg
+            className="svg-inline--fa fa-comment"
+            aria-hidden="true"
+            focusable="false"
+            data-prefix="fas"
+            data-icon="comment"
+            role="img"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 512 512"
+          >
+            <path
+              fill="currentColor"
+              d="M512 240c0 114.9-114.6 208-256 208c-37.1 0-72.3-6.4-104.1-17.9c-11.9 8.7-31.3 20.6-54.3 30.6C73.6 471.1 44.7 480 16 480c-6.5 0-12.3-3.9-14.8-9.9c-2.5-6-1.1-12.8 3.4-17.4l0 0 0 0 0 0 0 0 .3-.3c.3-.3 .7-.7 1.3-1.4c1.1-1.2 2.8-3.1 4.9-5.7c4.1-5 9.6-12.4 15.2-21.6c10-16.6 19.5-38.4 21.4-62.9C17.7 326.8 0 285.1 0 240C0 125.1 114.6 32 256 32s256 93.1 256 208z"
+            ></path>
+          </svg>
+        )}
+      </a>
+    </div>
+  )
+}
+
+const ChatMessage = ({
+  chatText,
+  index
+}: {
+  chatText: ChatType
+  index: number
+}) => {
+  const [showSource, setShowSource] = useState(false)
+
+  return (
+    <div
+      className={`${
+        index % 2 === 0
+          ? "chat-user-message-container"
+          : "chat-bot-message-container"
+      }`}
+    >
+      <div
+        className={`${
+          index % 2 === 0 ? "chat-user-message" : "chat-bot-message"
+        }`}
+      >
+        {chatText.type === "loading" && (
+          <div className="loading-animation">
+            <span>.</span>
+            <span>.</span>
+            <span>.</span>
+          </div>
+        )}
+        <span>{chatText.message}</span>
+
+        {index % 2 === 1 && (
+          <div className="chat-bot-message-meta">
+            {chatText.documents && (
+              <div className="chat-bot-message-source">
+                <button
+                  className="chat-bot-message-source-btn"
+                  onClick={() => {
+                    setShowSource(prev => !prev)
+                  }}
+                >
+                  Sources
+                  {/* Icon */}
+                </button>
+                <div
+                  className="chat-bot-message-source-list"
+                  style={{
+                    display: showSource ? "block" : "none"
+                  }}
+                >
+                  {chatText.documents.map((document, index) => {
+                    return (
+                      <div key={index} className="chat-bot-message-source-item">
+                        <a href={document.resource_url}>
+                          {document.resource_name}
+                        </a>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            <div className="spiral-chat-bot-message-rate">
+              {/* Rate Buttons */}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+全体的に、コンポーネントの分割ができていないので、リファクタしてください。
+answer: 以下は、提案されたコード構造の変更です。これにより、コンポーネントがより簡潔になり、理解しやすくなります。
+
+まず、チャットメッセージの表示に関連する部分を個別のコンポーネントに分割します。この例では、`UserMessage` と `BotMessage` コンポーネントを作成しています：
+
+```jsx
+const UserMessage = ({ message }) => (
+  <div className="chat-user-message-container">
+    <div className="chat-user-message">
+      <span>{message}</span>
+    </div>
+  </div>
+);
+
+const BotMessage = ({ chatText }) => {
+  const [showSource, setShowSource] = useState(false);
+
+  return (
+    <div className="chat-bot-message-container">
+      <div className="chat-bot-message">
+        {chatText.type === "loading" ? (
+          <LoadingAnimation />
+        ) : (
+          <span>{chatText.message}</span>
+        )}
+        <BotMessageMeta chatText={chatText} />
+      </div>
+    </div>
+  );
+};
+
+const BotMessageMeta = ({ chatText }) => {
+  const [showSource, setShowSource] = useState(false);
+
+  return (
+    <div className="chat-bot-message-meta">
+      {/* Add Sources and Rate Buttons here */}
+      {chatText.documents && (
+        <Sources showSource={showSource} setShowSource={setShowSource} />
+      )}
+      <RateButtons />
+    </div>
+  );
+};
+```
+
+次に、`LoadingAnimation` コンポーネントを作成して、読み込み時のアニメーションを表示します：
+
+```jsx
+const LoadingAnimation = () => (
+  <div className="loading-animation">
+    <span>.</span>
+    <span>.</span>
+    <span>.</span>
+  </div>
+);
+```
+
+最後に、これらの新しいコンポーネントを使用して、`ChatMessage` コンポーネントを簡潔にします：
+
+```jsx
+const ChatMessage = ({ chatText, index }) => {
+  return index % 2 === 0 ? (
+    <UserMessage message={chatText.message} />
+  ) : (
+    <BotMessage chatText={chatText} />
+  );
+};
+```
+
+これにより、全体のコードがより整理され、各コンポーネントがより一貫した機能を持つようになります。

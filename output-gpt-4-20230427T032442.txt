@@ -1,0 +1,53 @@
+model: gpt-4
+time: 0:00:54.180327
+question: 
+<script
+  id="test"
+  type="text/javascript"
+  async
+  src="../dist/embedded-chat.umd.cjs"
+></script>
+<script type="text/javascript">
+  const script = document.getElementById("test")
+  script.addEventListener("load", () => {
+    run({ id: "ここにBOT_IDを埋め込む" })
+  })
+</script>
+
+../dist/embedded-chat.umd.cjsでは、
+
+export const run = ({ id }: { id: string }) => {
+  if (document.getElementById("test-bot")) {
+    return
+  }
+  const root = document.createElement("div")
+  root.id = "test-bot"
+
+  document.body.appendChild(root)
+  ReactDOM.createRoot(root as HTMLElement).render(
+    <div>
+      <EmbeddedChat id={id} />
+    </div>
+  )
+}
+
+のような処理を行っています。
+
+上のスクリプトでは、elementが読み込まれた時に、run({ id: "ここにBOT_IDを埋め込む" })を実行しています。
+しかし、elementが作成される前に、run({ id: "ここにBOT_IDを埋め込む" })が実行されてしまうことがあります。
+そのため、elementが作成されるた後に、run({ id: "ここにBOT_IDを埋め込む" })を実行するようにしたいです。
+
+<script type="text/javascript">window.DocsBotAI=window.DocsBotAI||{},DocsBotAI.init=function(t){return new Promise((e,n)=>{var s=document.createElement("script");s.type="text/javascript",s.async=!0,s.src="https://widget.docsbot.ai/chat.js";const i=document.getElementsByTagName("script")[0];i.parentNode.insertBefore(s,i),s.addEventListener("load",()=>{window.DocsBotAI.mount({id:t.id,supportCallback:t.supportCallback});let o;o=function o(t){return new Promise((e)=>{if(document.querySelector(t))return e(document.querySelector(t));const n=new MutationObserver((o)=>{if(document.querySelector(t))return e(document.querySelector(t)),n.disconnect()});n.observe(document.body,{childList:!0,subtree:!0})})},o&&o("#docsbotai-root").then(e).catch(n)}),s.addEventListener("error",(t)=>{n(t.message)})})}</script>
+<script type="text/javascript">
+  DocsBotAI.init({id: "tB6rHR2P5WURmveAcdiH/d6az4NzmyNQHxhYdzXOd"});
+</script>
+
+上が参考です。
+
+修正してください。
+
+answer: 以下の修正を行いました。`run`関数の実行を、`s.addEventListener("load", ....` の中で行うように変更しました。これによって、elementが作成された後に`run`関数が実行されるようになります。
+
+```html
+<script type="text/javascript">window.DocsBotAI=window.DocsBotAI||{},DocsBotAI.init=function(t){return new Promise((e,n)=>{var s=document.createElement("script");s.type="text/javascript",s.async=!0,s.src="../dist/embedded-chat.umd.cjs";const i=document.getElementsByTagName("script")[0];i.parentNode.insertBefore(s,i),s.addEventListener("load",()=>{run({ id: "ここにBOT_IDを埋め込む" });let o;o=function o(t){return new Promise((e)=>{if(document.querySelector(t))return e(document.querySelector(t));const n=new MutationObserver((o)=>{if(document.querySelector(t))return e(document.querySelector(t)),n.disconnect()});n.observe(document.body,{childList:!0,subtree:!0})})},o&&o("#test-bot").then(e).catch(n)}),s.addEventListener("error",(t)=>{n(t.message)})})}</script>
+```

@@ -1,0 +1,286 @@
+model: gpt-4
+time: 0:03:20.200489
+question: 
+
+```TypeScript
+import Accordion from "@mui/material/Accordion"
+import AccordionSummary from "@mui/material/AccordionSummary"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { APIDocs } from "../../APIDocs"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+import {
+  Container,
+  Box,
+  Grid,
+  Typography,
+  Button,
+  Modal,
+  TextField
+} from "@mui/material"
+import { useState } from "react"
+
+export const APIKey = () => {
+  console.log("APIKey")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+  const [modalOpen, setModalOpen] = useState(false)
+  const handleModalOpen = () => {
+    setModalOpen(true)
+  }
+  const handleModalClose = () => {
+    setModalOpen(false)
+  }
+
+  const embedCode = `
+    <script
+      id="test"
+      type="text/javascript"
+      async
+      src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+    ></script>
+    <script type="text/javascript">
+      const script = document.getElementById("test");
+      script.addEventListener("load", () => {
+        globalThis.run({ id: "${botID}" });
+      });
+    </script>
+  `
+
+  // console.log("botID", botID)
+  // console.log("companyID", companyID)
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Grid container justifyContent="flex-end">
+            <Grid item xs={13}>
+              <Typography variant="h5">外部連携</Typography>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {/* <ReactMarkdown>{markdown}</ReactMarkdown> */}
+            {/* <SyntaxHighlighter language={"shell"} style={prism}>
+          {"curl -X hhoho"}
+      </SyntaxHighlighter> */}
+            <APIDocs />
+          </AccordionDetails>
+        </Accordion>
+
+        <Button variant="contained" color="primary" onClick={handleModalOpen}>
+          Embed Code
+        </Button>
+
+        <Modal
+          open={modalOpen}
+          onClose={handleModalClose}
+          aria-labelledby="embed-code-modal"
+          aria-describedby="embed-code-modal-description"
+        >
+          <Box
+            sx={{
+              width: "80%",
+              maxWidth: "800px",
+              backgroundColor: "white",
+              border: "2px solid #000",
+              p: 2,
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              overflow: "scroll"
+            }}
+          >
+            <Typography id="embed-code-modal" variant="h6" component="h2">
+              組み込みスクリプト
+            </Typography>
+            <TextField
+              id="embed-code-modal-description"
+              fullWidth
+              multiline
+              rows={4}
+              value={embedCode}
+            />
+            <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
+              <Button color="primary" onClick={handleModalClose}>
+                Close
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
+      </Box>
+    </>
+  )
+}
+
+```
+
+上のReactのコードで、モーダルで組み込みスクリプトを表示するようなコードを書いているのですが、モーダル内のコードが読みづらいです。
+よりよいデザインを考えてください。
+
+
+answer: こちらのデザインの提案です。モーダル内部のデザインを見やすく、コピーしやすいように修正しています。また、コードをコピーするボタンも追加しました。
+
+```TypeScript
+import Accordion from "@mui/material/Accordion"
+import AccordionSummary from "@mui/material/AccordionSummary"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { APIDocs } from "../../APIDocs"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+import {
+  Container,
+  Box,
+  Grid,
+  Typography,
+  Button,
+  Modal,
+  TextField,
+  IconButton
+} from "@mui/material"
+import { useState } from "react"
+import CopyIcon from "@mui/icons-material/FileCopy"
+
+
+export const APIKey = () => {
+  console.log("APIKey")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+  const [modalOpen, setModalOpen] = useState(false)
+  const handleModalOpen = () => {
+    setModalOpen(true)
+  }
+  const handleModalClose = () => {
+    setModalOpen(false)
+  }
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(embedCode)
+  }
+
+  const embedCode = `
+    <script
+      id="test"
+      type="text/javascript"
+      async
+      src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+    ></script>
+    <script type="text/javascript">
+      const script = document.getElementById("test");
+      script.addEventListener("load", () => {
+        globalThis.run({ id: "${botID}" });
+      });
+    </script>
+  `
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Grid container justifyContent="flex-end">
+            <Grid item xs={13}>
+              <Typography variant="h5">外部連携</Typography>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <APIDocs />
+          </AccordionDetails>
+        </Accordion>
+
+        <Button variant="contained" color="primary" onClick={handleModalOpen}>
+          Embed Code
+        </Button>
+
+        <Modal
+          open={modalOpen}
+          onClose={handleModalClose}
+          aria-labelledby="embed-code-modal"
+          aria-describedby="embed-code-modal-description"
+        >
+          <Box
+            sx={{
+              width: "80%",
+              maxWidth: "800px",
+              backgroundColor: "white",
+              borderRadius: 2,
+              boxShadow: 24,
+              p: 2,
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Typography id="embed-code-modal" variant="h6" component="h2">
+                組み込みスクリプト
+              </Typography>
+              <IconButton
+                color="primary"
+                sx={{size: "2rem", p: "1rem"}}
+                onClick={handleCopyCode}
+                title="コードをコピー"
+              >
+                <CopyIcon />
+              </IconButton>
+            </Box>
+            <TextField
+              id="embed-code-modal-description"
+              fullWidth
+              multiline
+              rows={4}
+              value={embedCode}
+              variant="outlined"
+            />
+            <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
+              <Button color="primary" onClick={handleModalClose}>
+                Close
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
+      </Box>
+    </>
+  )
+}
+
+```
+
+以下の点を修正しました：
+
+1. モーダルの`backgroundColor`を`white`にし、`borderRadius`と`boxShadow`を適用しました。
+2. テキストフィールドの`variant`を`outlined`に変更しました。
+3. コピーするアイコンボタンとして`CopyIcon`を追加しました。

@@ -1,0 +1,650 @@
+model: gpt-4
+time: 0:03:36.704316
+question: 
+
+```TypeScript
+import React, { useEffect, useRef, useState } from "react"
+import "./index.css"
+
+const ChatForm = ({
+  companyID,
+  botID
+}: {
+  companyID: string
+  botID: string
+}) => {
+  const [inputText, setInputText] = useState<string>("")
+  const [chatTexts, setChatTexts] = useState<string[]>([])
+  const endpointURLBase: string = import.meta.env.VITE_WEBSOCKET_ENDPOINT
+  const endpointURL: string =
+    botID && companyID
+      ? endpointURLBase +
+        "?" +
+        "bot_id=" +
+        botID +
+        "&" +
+        "company_id=" +
+        companyID
+      : endpointURLBase
+  const [isClickedSend, setIsClickedSend] = useState<boolean>(false)
+  const chatTextsElement = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (chatTextsElement.current) {
+      chatTextsElement.current.scrollTop = chatTextsElement.current.scrollHeight
+    }
+  }, [chatTexts])
+
+  const onClickSend = async () => {
+    if (isClickedSend) {
+      return
+    }
+    chatTextsElement?.current?.scrollTo(
+      0,
+      chatTextsElement.current.scrollHeight
+    )
+    // const chatTextsElement = document.getElementById("chat_texts")
+    setIsClickedSend(true)
+    const text = inputText
+    const storeChatTexts = [...chatTexts, text]
+    setChatTexts(storeChatTexts)
+    setInputText("")
+
+    const connection = new WebSocket(endpointURL)
+
+    connection.onopen = function () {
+      connection.send(
+        JSON.stringify({
+          action: "sendmessage",
+          company_id: companyID,
+          user_id: companyID,
+          bot_id: botID,
+          history: chatTexts.map((setChatText, index) => {
+            if (index % 2 === 0) {
+              return {
+                type: "human",
+                message: setChatText
+              }
+            } else {
+              return {
+                type: "ai",
+                message: setChatText
+              }
+            }
+          }),
+          user_input: text
+        })
+      )
+    }
+
+    let responseText = ""
+
+    connection.onmessage = function (event) {
+      const eventData: string = event.data.toString()
+      responseText += eventData.includes("Endpoint request timed out")
+        ? ""
+        : eventData
+      setChatTexts([...storeChatTexts, responseText])
+    }
+
+    connection.onerror = function () {}
+
+    connection.onclose = function () {
+      setIsClickedSend(false)
+    }
+  }
+
+  return (
+    <div className="chat-container">
+      <div className="chat-header">
+        <div className="chat-header-title">
+          <h1>SpiralBot</h1>
+          <span>{botID}</span>
+        </div>
+      </div>
+      <div className="chat-message-container" ref={chatTextsElement}>
+        <div className="chat-message">
+          <div className="chat-message-content">
+            <p>
+              <div key={0} className="chat-bot-message-container">
+                <div className="chat-bot-message">
+                  はじめまして、私はSpiralBotです！
+                </div>
+              </div>
+              {chatTexts.map((chatText, index) => {
+                return (
+                  <div
+                    key={index}
+                    className={`${
+                      index % 2 === 0
+                        ? "chat-user-message-container"
+                        : "chat-bot-message-container"
+                    }`}
+                  >
+                    <div
+                      className={`${
+                        index % 2 === 0
+                          ? "chat-user-message"
+                          : "chat-bot-message"
+                      }`}
+                    >
+                      <span>{chatText}</span>
+                      {/* resource hidden button if bot */}
+                      {index % 2 === 1 && (
+                        <div className="chat-bot-message-meta">
+                          <button
+                            className="chat-bot-message-source-btn"
+                            onClick={() => {
+                              console.log("Source")
+                            }}
+                          >
+                            Sources
+                            <svg
+                              aria-hidden="true"
+                              focusable="false"
+                              data-prefix="fas"
+                              data-icon="chevron-down"
+                              className="source-hidden-button-icon"
+                              role="img"
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 512 512"
+                            >
+                              <path
+                                fill="currentColor"
+                                d="M233.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 338.7 86.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"
+                              ></path>
+                            </svg>
+                          </button>
+                          <div className="spiral-chat-bot-message-rate">
+                            <button
+                              className="chat-bot-message-rate-btn"
+                              onClick={() => {
+                                console.log("unhelpful")
+                              }}
+                            >
+                              <svg
+                                aria-hidden="true"
+                                focusable="false"
+                                data-prefix="far"
+                                data-icon="face-frown-open"
+                                className="chat-bot-message-rate-btn-icon"
+                                role="img"
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 512 512"
+                              >
+                                <path
+                                  fill="currentColor"
+                                  d="M464 256A208 208 0 1 0 48 256a208 208 0 1 0 416 0zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zM182.4 382.5c-12.4 5.2-26.5-4.1-21.1-16.4c16-36.6 52.4-62.1 94.8-62.1s78.8 25.6 94.8 62.1c5.4 12.3-8.7 21.6-21.1 16.4c-22.4-9.5-47.4-14.8-73.7-14.8s-51.3 5.3-73.7 14.8zM144.4 208a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm192-32a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"
+                                ></path>
+                              </svg>
+                            </button>
+                            <button
+                              className="chat-bot-message-rate-btn"
+                              onClick={() => {
+                                console.log("helpful")
+                              }}
+                            >
+                              <svg
+                                aria-hidden="true"
+                                focusable="false"
+                                data-prefix="far"
+                                data-icon="face-grin"
+                                className="chat-bot-message-rate-btn-icon"
+                                role="img"
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 512 512"
+                              >
+                                <path
+                                  fill="currentColor"
+                                  d="M464 256A208 208 0 1 0 48 256a208 208 0 1 0 416 0zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm349.5 52.4c18.7-4.4 35.9 12 25.5 28.1C350.4 374.6 306.3 400 255.9 400s-94.5-25.4-119.1-63.5c-10.4-16.1 6.8-32.5 25.5-28.1c28.9 6.8 60.5 10.5 93.6 10.5s64.7-3.7 93.6-10.5zM144.4 208a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm192-32a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"
+                                ></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="chat-input-container">
+        <form className="chat-input-form">
+          <input
+            type="text"
+            className="chat-input"
+            placeholder="Type a message..."
+            onChange={e => {
+              setInputText(e.target.value)
+            }}
+            value={inputText}
+          />
+          <button
+            type="submit"
+            className="chat-btn-send"
+            onClick={e => {
+              e.preventDefault()
+              void onClickSend()
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 512 512"
+              className="chat-btn-send-icon"
+            >
+              <path d="M476 3.2L12.5 270.6c-18.1 10.4-15.8 35.6 2.2 43.2L121 358.4l287.3-253.2c5.5-4.9 13.3 2.6 8.6 8.3L176 407v80.5c0 23.6 28.5 32.9 42.5 15.8L282 426l124.6 52.2c14.2 6 30.4-2.9 33-18.2l72-432C515 7.8 493.3-6.8 476 3.2z"></path>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export const EmbeddedChat = ({
+  botID,
+  companyID
+}: {
+  botID: string
+  companyID: string
+}) => {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: "20px",
+        right: "20px"
+      }}
+    >
+      {open && <ChatForm botID={botID} companyID={companyID} />}
+      <a
+        id={botID}
+        className="floating-button"
+        onClick={() => {
+          setOpen(prev => !prev)
+        }}
+      >
+        {open ? (
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            data-prefix="fas"
+            data-icon="xmark"
+            className="svg-inline--fa fa-xmark"
+            role="img"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 384 512"
+          >
+            <path
+              fill="currentColor"
+              d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"
+            ></path>
+          </svg>
+        ) : (
+          <svg
+            className="svg-inline--fa fa-comment"
+            aria-hidden="true"
+            focusable="false"
+            data-prefix="fas"
+            data-icon="comment"
+            role="img"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 512 512"
+          >
+            <path
+              fill="currentColor"
+              d="M512 240c0 114.9-114.6 208-256 208c-37.1 0-72.3-6.4-104.1-17.9c-11.9 8.7-31.3 20.6-54.3 30.6C73.6 471.1 44.7 480 16 480c-6.5 0-12.3-3.9-14.8-9.9c-2.5-6-1.1-12.8 3.4-17.4l0 0 0 0 0 0 0 0 .3-.3c.3-.3 .7-.7 1.3-1.4c1.1-1.2 2.8-3.1 4.9-5.7c4.1-5 9.6-12.4 15.2-21.6c10-16.6 19.5-38.4 21.4-62.9C17.7 326.8 0 285.1 0 240C0 125.1 114.6 32 256 32s256 93.1 256 208z"
+            ></path>
+          </svg>
+        )}
+      </a>
+    </div>
+  )
+}
+
+
+```
+
+```
+.floating-button {
+  position: fixed;
+  min-width: 55px;
+  height: 55px;
+  bottom: 20px;
+  right: 20px;
+  color: #fff;
+  border-radius: 50px;
+  text-align: center;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+  font-weight: 500;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  cursor: pointer;
+  background-color: rgb(18, 146, 238);
+  color: rgb(255, 255, 255);
+  box-shadow: rgba(0, 0, 0, 0.05) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.1) 0px 3px 5px 0px, rgba(0, 0, 0, 0.05) 0px 3px 3px 0px;
+}
+
+.floating-button:hover {
+  background-color: rgb(18, 146, 238);
+  color: rgb(255, 255, 255);
+}
+
+.floating-button:active {
+  background-color: rgb(18, 146, 238);
+  color: rgb(255, 255, 255);
+}
+
+.svg-inline--fa {
+  font-size: 1.5rem;
+  height: 1.5rem;
+}
+
+.chat-container {
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  width: 400px;
+  position: fixed;
+  right: 20px;
+  bottom: 100px;
+  min-height: 250px;
+  max-height: 650px;
+  box-shadow: rgba(0, 0, 0, 0.05) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.15) 0px 5px 30px 0px, rgba(0, 0, 0, 0.05) 0px 3px 3px 0px;
+  z-index: 999999;
+  line-height: 1em;
+  background-color: rgb(249, 250, 250);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 120px);
+}
+
+.chat-header {
+  border-top-right-radius: 5px;
+  border-top-left-radius: 5px;
+  background-color: rgb(18, 146, 238);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: rgb(255, 255, 255);
+  padding: 15px 12.5px;
+  text-align: justify;
+}
+
+.chat-input-container {
+  padding: 8px 8px 8px 0px;
+  border: none;
+  font-size: 0.85rem;
+  width: 100%;
+  display: flex;
+  border-top: 1px solid #d8d8d8;
+}
+
+.chat-btn-send {
+  background-color: #fff;
+  padding-right: 12.5px;
+  border: none;
+}
+
+.chat-btn-send-icon {
+  background-color: #fff;
+  padding-right: 12.5px;
+  border: none;
+  color: #b3b3b3;
+  cursor: pointer;
+  fill: rgb(18, 146, 238);
+  width: 15px;
+}
+
+.chat-input-form {
+  width: 100%;
+  display: flex;
+  background-color: #fff;
+}
+
+.chat-input {
+  width: 100%;
+  padding: 8px 8px 8px 8px;
+  font-size: 0.85rem;
+  border: none;
+  outline: none;
+}
+
+.chat-bot-message {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+  justify-content: flex-start;
+}
+
+.chat-message-container {
+  padding: 15px 10px 0 10px;
+  overflow-y: scroll;
+  height: 100%;
+  min-height: 250px;
+  max-height: 650px;
+}
+
+.chat-bot-message-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.chat-bot-message-container > .chat-bot-message {
+  background-color: rgb(207, 233, 251);
+  color: rgb(82, 93, 100);
+  padding: 10px;
+  border-radius: 5px;
+  border-bottom-left-radius: 0;
+  border: 0.5px solid rgb(197, 206, 214);
+  font-size: 0.9rem;
+  color: #585858;
+  font-weight: medium;
+  position: relative;
+  text-align: left;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  display: flex;
+}
+
+.chat-user-message-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-top: 8px;
+}
+
+.chat-user-message-container > .chat-user-message {
+  background-color: #fff;
+  padding: 10px;
+  border-radius: 5px;
+  border-bottom-right-radius: 0;
+  border: 0.5px solid rgb(197, 206, 214);
+  font-size: 0.9rem;
+  color: #585858;
+  font-weight: medium;
+  position: relative;
+  text-align: left;
+  overflow-wrap: break-word;
+  overflow: hidden;
+}
+
+.spiral-chat-bot-message-rate {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.chat-bot-message-rate-btn {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-weight: bold;
+  padding: 0;
+  margin-top: 1.3em;
+  cursor: pointer;
+  display: flex;
+}
+
+.chat-bot-message-rate-btn-icon {
+  height: 1rem;
+  font-size: 1.25rem;
+}
+
+.chat-bot-message-source-btn {
+  background-color: transparent;
+  border: 0;
+  margin-top: 1rem;
+  padding: 0 0 0 0;
+  display: flex;
+  align-items: center;
+}
+
+.source-hidden-button-icon {
+  height: 1rem;
+  font-size: 1.25rem;
+  background-color: transparent;
+}
+
+.chat-bot-message-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: inherit;
+  align-items: center;
+}
+
+@media screen and (max-width: 480px) {
+  .chat-container {
+    width: 80%;
+    min-width: 250px;
+  }
+}
+```
+
+上のコードで、チャットが返ってくるまでの間、メッセージを送信して、ボットからメッセージが返ってくるまでの間に、ローディングアイコンを表示するようにしてください。
+
+
+
+answer: 以下のコードで要望に応えました。ローディングアイコンを表示するために、`useState` の新しい state `isLoading` を追加しました。`onClickSend` 関数内で、メッセージが送信されたときに `setIsLoading(true)` を設定し、メッセージが返答されたときに `setIsLoading(false)` を設定しました。また、ローディングアイコンのスタイルを設定するための新しい CSS を追加しました。
+
+```TypeScript
+import React, { useEffect, useRef, useState } from "react";
+import "./index.css";
+
+const ChatForm = ({ companyID, botID }: { companyID: string; botID: string }) => {
+  const [inputText, setInputText] = useState<string>("");
+  const [chatTexts, setChatTexts] = useState<string[]>([]);
+  const endpointURLBase: string = import.meta.env.VITE_WEBSOCKET_ENDPOINT;
+  const endpointURL: string = botID && companyID ? `${endpointURLBase}?bot_id=${botID}&company_id=${companyID}` : endpointURLBase;
+  const [isClickedSend, setIsClickedSend] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // Add this line
+  const chatTextsElement = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (chatTextsElement.current) {
+      chatTextsElement.current.scrollTop = chatTextsElement.current.scrollHeight;
+    }
+  }, [chatTexts]);
+
+  const onClickSend = async () => {
+    if (isClickedSend) {
+      return;
+    }
+    chatTextsElement?.current?.scrollTo(0, chatTextsElement.current.scrollHeight);
+    setIsClickedSend(true);
+    setIsLoading(true); // Add this line
+    const text = inputText;
+    const storeChatTexts = [...chatTexts, text];
+    setChatTexts(storeChatTexts);
+    setInputText("");
+
+    const connection = new WebSocket(endpointURL);
+
+    connection.onopen = function () {
+      connection.send(JSON.stringify({
+        action: "sendmessage",
+        company_id: companyID,
+        user_id: companyID,
+        bot_id: botID,
+        history: chatTexts.map((setChatText, index) => {
+          if (index % 2 === 0) {
+            return { type: "human", message: setChatText };
+          } else {
+            return { type: "ai", message: setChatText };
+          }
+        }),
+        user_input: text,
+      }));
+    };
+
+    let responseText = "";
+
+    connection.onmessage = function (event) {
+      setIsLoading(false); // Add this line
+      const eventData: string = event.data.toString();
+      responseText += eventData.includes("Endpoint request timed out") ? "" : eventData;
+      setChatTexts([...storeChatTexts, responseText]);
+    };
+
+    connection.onerror = function () {};
+
+    connection.onclose = function () {
+      setIsClickedSend(false);
+    };
+  };
+
+  return (
+    <div className="chat-container">
+      ...
+      <div className="chat-message-container" ref={chatTextsElement}>
+        ...
+        {isLoading && ( // Add this block
+          <div className="loading-icon-container">
+            <div className="loading-icon"></div>
+          </div>
+        )}
+        ...
+      </div>
+      ...
+    </div>
+  );
+};
+```
+
+そして、新しい CSS を追加：
+
+```CSS
+.loading-icon-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.loading-icon {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: rgba(0, 120, 231, 1);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+```
+
+これで、メッセージが送信されたときにローディングアイコンが表示され、ボットからのメッセージが返されたときに非表示になります。

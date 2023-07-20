@@ -1,0 +1,213 @@
+model: gpt-4
+time: 0:01:37.616093
+question: ```
+class GenerateResponseType:
+    human_input: str
+    history: str
+    text: str
+
+    def __init__(self, human_input: str, history: str, text: str) -> None:
+        self.human_input = human_input
+        self.history = history
+        self.text = text
+
+
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str):
+        self.model_name = model_name
+        self.max_tokens = self._get_max_tokens(model_name)
+        self.api_key = api_key
+        self.prompt = prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
+
+        self.llm = LLMChain(
+            llm=ChatOpenAI(model=model_name, openai_api_key=api_key, client=None, streaming=True),
+            prompt=prompt,
+            verbose=True,
+            memory=ConversationBufferWindowMemory(k=2),
+        )
+
+    def _get_max_tokens(self, model_name: str) -> Optional[int]:
+        model_token_limits = {
+            "gpt-3.5-turbo": 4096,
+            # Add more model token limits here if needed
+        }
+        return model_token_limits.get(model_name)
+
+    def generate_response(self, question: str, max_tokens: Optional[int] = None, temperature: float = 0.7, n: int = 1) -> str:
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        response = self.llm(question)
+        res = GenerateResponseType(**response)
+
+        return res.text
+
+```
+
+上のコードで、`LangChainClient` に、Callback関数を持つようなメソッドを追加したいです。
+
+
+```
+from typing import Any, Dict, List, Optional, Union
+
+from langchain.callbacks.base import CallbackManager, BaseCallbackHandler
+from langchain.schema import AgentAction, AgentFinish, LLMResult
+
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage
+
+class MyCustomCallbackHandler(BaseCallbackHandler):
+    """Custom CallbackHandler."""
+
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> None:
+        pass
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        pass
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        '''新しいtokenが来たらprintする'''
+        print('\033[36m' + token + '\033[0m')
+
+    def on_llm_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_chain_start(
+        self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any
+    ) -> None:
+        """Print out that we are entering a chain."""
+        class_name = serialized["name"]
+        print(f"\n\n\033[1m> Entering new {class_name} chain...\033[0m")
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Print out that we finished a chain."""
+        print("\n\033[1m> Finished chain.\033[0m")
+
+    def on_chain_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_tool_start(
+        self,
+        serialized: Dict[str, Any],
+        input_str: str,
+        **kwargs: Any,
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_agent_action(
+        self, action: AgentAction, color: Optional[str] = None, **kwargs: Any
+    ) -> Any:
+        """Run on agent action."""
+        print(action)
+
+    def on_tool_end(
+        self,
+        output: str,
+        color: Optional[str] = None,
+        observation_prefix: Optional[str] = None,
+        llm_prefix: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """If not the final action, print out observation."""
+        print(output)
+
+    def on_tool_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Do nothing."""
+        pass
+
+    def on_text(
+        self,
+        text: str,
+        color: Optional[str] = None,
+        end: str = "",
+        **kwargs: Optional[str],
+    ) -> None:
+        """Run when agent ends."""
+        print(text)
+
+    def on_agent_finish(
+        self, finish: AgentFinish, color: Optional[str] = None, **kwargs: Any
+    ) -> None:
+        """Run on agent end."""
+        print(finish.log)
+
+import key, os
+
+os.environ["OPENAI_API_KEY"] = key.OPEN_API_KEY
+
+llm = ChatOpenAI(streaming=True, callback_manager=CallbackManager([MyCustomCallbackHandler()]), verbose=True, temperature=0)
+print(llm(messages=[HumanMessage(content="炭酸水についての歌詞を書いてください。")]))
+```
+
+上は参考のCallback関数です。
+
+コードを作成して、参考コードを書いて
+
+answer: 以下のように`LangChainClient`にカスタムのコールバックを追加することができます。
+
+```python
+from typing import Any, Dict, List, Optional, Union
+
+from langchain.callbacks.base import CallbackManager, BaseCallbackHandler
+from langchain.schema import AgentAction, AgentFinish, LLMResult
+
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage
+
+# MyCustomCallbackHandler クラスをここで記述してください
+
+class LangChainClient:
+    def __init__(self, model_name: str, api_key: str, callbacks: Optional[List[BaseCallbackHandler]] = None):
+        self.model_name = model_name
+        self.max_tokens = self._get_max_tokens(model_name)
+        self.api_key = api_key
+        self.prompt = prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
+        self.callback_manager = CallbackManager(callbacks if callbacks else [])
+
+        self.llm = LLMChain(
+            llm=ChatOpenAI(model=model_name, openai_api_key=api_key, client=None, streaming=True, callback_manager=self.callback_manager),
+            prompt=prompt,
+            verbose=True,
+            memory=ConversationBufferWindowMemory(k=2),
+        )
+
+    def _get_max_tokens(self, model_name: str) -> Optional[int]:
+        model_token_limits = {
+            "gpt-3.5-turbo": 4096,
+            # Add more model token limits here if needed
+        }
+        return model_token_limits.get(model_name)
+
+    def generate_response(self, question: str, max_tokens: Optional[int] = None, temperature: float = 0.7, n: int = 1) -> str:
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        response = self.llm(question)
+        res = GenerateResponseType(**response)
+
+        return res.text
+
+if __name__ == "__main__":
+    import key, os
+
+    os.environ["OPENAI_API_KEY"] = key.OPEN_API_KEY
+
+    client = LangChainClient(model_name="gpt-3.5-turbo", api_key=os.environ["OPENAI_API_KEY"], callbacks=[MyCustomCallbackHandler()])
+    response = client.generate_response("炭酸水についての歌詞を書いてください。")
+    print(response)
+```
+
+この変更により、`LangChainClient`インスタンスを作成する際にコールバックハンドラを追加できます。例えば、上記の`MyCustomCallbackHandler`をコールバックとして追加しました。
+
+また、`__main__`ブロックを追加して、生成されたレスポンスを表示するようにしました。必要に応じて、この部分を適切な形式に変更してください。

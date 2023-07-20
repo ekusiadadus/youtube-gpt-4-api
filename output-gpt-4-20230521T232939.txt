@@ -1,0 +1,251 @@
+model: gpt-4
+time: 0:02:03.684209
+question: model: gpt-4
+time: 0:00:52.230439
+question: {
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "outDir": "dist",
+    "declarationDir": "dist/types",
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src", "src/index.d.ts"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
+
+{
+  "name": "react-shogi",
+  "private": false,
+  "version": "0.0.9",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "ekusiadadus",
+    "email": "ekusiadadus@gmail.com"
+  },
+  "main": "./dist/types/index.d.ts",
+  "module": "./dist/types/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ekusiadadus/react-shogi"
+  },
+  "files": [
+    "dist",
+    "dist/types"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/*",
+      "require": "./dist/ShogiGame.umd.js"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "typecheck": "tsc -p .",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "lint:css": "stylelint \"src/**/*.css\" --fix",
+    "prepare": "husky install",
+    "build:shogi": "tsc && vite --config vite.EmbeddedShogi.config.ts build",
+    "build:lib": " vite --config vite.Library.config.ts build && tsc --project tsconfig.library.json"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": "eslint --fix",
+    "*.{js,jsx,ts,tsx,json,yml,html,css,md}": "prettier --write"
+  },
+  "dependencies": {
+    "@rollup/plugin-terser": "^0.4.3",
+    "@types/node": "^20.2.1",
+    "eslint-config-preact": "^1.3.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-config-standard-with-typescript": "^34.0.1",
+    "eslint-plugin-import": "^2.27.5",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.2.2",
+    "prettier": "^2.8.8",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "stylelint": "^15.6.2",
+    "stylelint-config-recommended": "^12.0.0",
+    "stylelint-config-standard": "^33.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
+    "@typescript-eslint/eslint-plugin": "^5.57.1",
+    "@typescript-eslint/parser": "^5.59.5",
+    "@vitejs/plugin-react-swc": "^3.0.0",
+    "eslint": "^8.40.0",
+    "eslint-plugin-n": ">=15.0.0 <17.0.0",
+    "eslint-plugin-promise": ">=6.0.0 <7.0.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.0",
+    "typescript": "^5.0.4",
+    "vite": "^4.3.2"
+  }
+}
+
+src/lib/ShogiGame.tsx
+```typescriptimport Game from "../../components/Game/Game"
+
+export const ShogiGame = ({ KIF }: { KIF: string }) => {
+  return <Game KIF={KIF} />
+}
+```
+
+うえの設定ファイルでパッケージをnpmで配布すると、エラーが出てしまいます。
+
+Cannot find module 'react-shogi' or its corresponding type declarations.
+
+react-shogi から、ShogiGame をコンポーネントとして使用するにはどのように修正すればいいですか？
+answer: 問題が発生している原因は、`package.json`の`main`と`module`が、正しいビルドされたファイルを指していないためです。以下のように修正してください。
+
+`package.json`:
+```json
+{
+  ...
+  "main": "./dist/ShogiGame.umd.js",
+  "module": "./dist/ShogiGame.esm.js",
+  ...
+}
+```
+
+また、`tsconfig.json`で型宣言ファイル（`.d.ts`）の場所が指定されていないため、それも修正が必要です。次のように修正してください。
+
+`tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    ...
+    "declaration": true,
+    "outDir": "dist",
+    "declarationDir": "dist",
+    ...
+  },
+  ...
+}
+```
+
+これで、`react-shogi`パッケージをインポートして利用する際に、型宣言ファイルが正しく参照されるはずです。
+
+なお、ビルドする際には、次のコマンドを使用してください：
+
+```
+npm run build:lib
+```
+
+これで、`dist`ディレクトリが生成され、ビルドされたファイルが含まれます。
+
+これを全て修正しても、Cannot find module 'react-shogi' or its corresponding type declarations. となります。
+どうしても修正したいです。
+answer: すみません。提案した修正が不十分でした。改めて、より詳細に修正案を提案いたします。
+
+まず、`tsconfig.library.json`を以下のように修正してください：
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "isolatedModules": false,
+    "emitDeclarationOnly": false,
+    "declaration": true,
+    "outDir": "dist",
+    "declarationDir": "dist",
+    "module": "ESNext",
+    "moduleResolution": "Node"
+  },
+  "exclude": ["src/index.tsx", "src/**/*.test.ts", "src/**/*.test.tsx"]
+}
+```
+
+次に、`vite.Library.config.ts`を以下のように修正してください：
+
+```typescript
+import { defineConfig } from 'vite';
+import reactRefresh from '@vitejs/plugin-react-refresh';
+import type { Plugin } from 'vite';
+
+function outputPlugin(): Plugin {
+  return {
+    name: 'output-plugin',
+    async generateBundle(_, output) {
+      for (const chunk of Object.values(output)) {
+        if (typeof chunk !== 'string') {
+          if (chunk.facadeModuleId) {
+            chunk.fileName = 'ShogiGame.esm.js';
+            break;
+          }
+        }
+      }
+    },
+  };
+}
+
+export default defineConfig({
+  publicDir: false,
+  plugins: [reactRefresh(), outputPlugin()],
+  build: {
+    target: 'esnext',
+    outDir: 'dist',
+    minify: false, // ShogiGame.umd.js
+    lib: {
+      entry: 'src/lib/ShogiGame.tsx',
+      formats: ['es']
+    },
+    rollupOptions: {
+      external: ['react', 'react-dom'],
+      output: {
+        globals: {
+          react: 'React',
+          'react-dom': 'ReactDOM'
+        }
+      }
+    }
+  }
+});
+```
+
+そして、`src/lib/index.ts`ファイルを作成し、以下の内容を追加してください：
+
+```typescript
+export { ShogiGame } from './ShogiGame';
+```
+
+最後に、`package.json`を以下のように修正してください：
+
+```json
+{
+  ...
+  "main": "./dist/ShogiGame.esm.js",
+  "module": "./dist/ShogiGame.esm.js",
+  "types": "./dist/ShogiGame.d.ts",
+  ...
+}
+```
+
+これで、ビルド後の`dist`ディレクトリに、適切な設定で`.js`ファイルと`.d.ts`ファイルが生成されるはずです。
+
+以下のコマンドでパッケージをインストールし、対象プロジェクトでインポートが正常に行われることを確認してください：
+
+```
+npm run build:lib
+```
+
+`react-shogi`を正常にインポートできるようになります。

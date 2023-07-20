@@ -1,0 +1,64 @@
+model: gpt-4
+time: 0:01:48.252755
+question: 
+globalThis.run = ({ id }: { id: string }) => {
+  if (document.getElementById("test-bot")) {
+    return
+  }
+  console.log("run", id)
+  const root = document.createElement("div")
+  root.id = "test-bot"
+
+  document.body.appendChild(root)
+  ReactDOM.createRoot(root as HTMLElement).render(
+    <div>
+      <EmbeddedChat id={id} />
+    </div>
+  )
+}
+
+上のコードで、以下のエラーが出てしまいます。
+
+Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.
+
+修正してください。
+
+answer: 型 'typeof globalThis' にインデックスシグネチャがないため、エレメントは暗黙的に 'any' 型を持っています。`globalThis`に型を追加することで、エラーを解決できます。
+
+まず、`global.d.ts`というファイルをプロジェクトルートに作成します。そこに以下のコードを追加します。
+
+```typescript
+// global.d.ts
+declare module NodeJS {
+  interface Global {
+    run: ({ id }: { id: string }) => void
+  }
+}
+```
+
+これで、`globalThis`に`run`関数の型が追加されます。次に、コードの先頭で型をインポートし、`ReactDOM`と`EmbeddedChat`をインポートすることを確認してください。以下のように編集します。
+
+```typescript
+import ReactDOM from 'react-dom';
+import EmbeddedChat from './EmbeddedChat'; // あなたのプロジェクトで正しいパスを使用してください
+
+declare const global: NodeJS.Global;
+
+global.run = ({ id }: { id: string }) => {
+  if (document.getElementById("test-bot")) {
+    return
+  }
+  console.log("run", id)
+  const root = document.createElement("div")
+  root.id = "test-bot"
+
+  document.body.appendChild(root)
+  ReactDOM.createRoot(root as HTMLElement).render(
+    <div>
+      <EmbeddedChat id={id} />
+    </div>
+  )
+}
+```
+
+これで、エラーが解決されるはずです。

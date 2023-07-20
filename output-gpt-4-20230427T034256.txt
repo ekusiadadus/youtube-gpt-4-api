@@ -1,0 +1,102 @@
+model: gpt-4
+time: 0:01:15.516163
+question: 
+<script
+  id="test"
+  type="text/javascript"
+  async
+  src="../dist/embedded-chat.umd.cjs"
+></script>
+<script type="text/javascript">
+  const script = document.getElementById("test")
+  script.addEventListener("load", () => {
+    run({ id: "ここにBOT_IDを埋め込む" })
+  })
+</script>
+
+../dist/embedded-chat.umd.cjsでは、
+
+export const run = ({ id }: { id: string }) => {
+  if (document.getElementById("test-bot")) {
+    return
+  }
+  const root = document.createElement("div")
+  root.id = "test-bot"
+
+  document.body.appendChild(root)
+  ReactDOM.createRoot(root as HTMLElement).render(
+    <div>
+      <EmbeddedChat id={id} />
+    </div>
+  )
+}
+
+のような処理を行っています。
+
+上のスクリプトでは、elementが読み込まれた時に、run({ id: "ここにBOT_IDを埋め込む" })を実行しています。
+しかし、elementが作成される前に、run({ id: "ここにBOT_IDを埋め込む" })が実行されてしまうことがあります。
+そのため、elementが作成されるた後に、run({ id: "ここにBOT_IDを埋め込む" })を実行するようにしたいです。
+
+<script type="text/javascript">window.DocsBotAI=window.DocsBotAI||{},DocsBotAI.init=function(t){return new Promise((e,n)=>{var s=document.createElement("script");s.type="text/javascript",s.async=!0,s.src="https://widget.docsbot.ai/chat.js";const i=document.getElementsByTagName("script")[0];i.parentNode.insertBefore(s,i),s.addEventListener("load",()=>{window.DocsBotAI.mount({id:t.id,supportCallback:t.supportCallback});let o;o=function o(t){return new Promise((e)=>{if(document.querySelector(t))return e(document.querySelector(t));const n=new MutationObserver((o)=>{if(document.querySelector(t))return e(document.querySelector(t)),n.disconnect()});n.observe(document.body,{childList:!0,subtree:!0})})},o&&o("#docsbotai-root").then(e).catch(n)}),s.addEventListener("error",(t)=>{n(t.message)})})}</script>
+<script type="text/javascript">
+  DocsBotAI.init({id: "tB6rHR2P5WURmveAcdiH/d6az4NzmyNQHxhYdzXOd"});
+</script>
+
+上が参考です。
+
+修正してください。
+
+answer: 以下のように修正しました。`run`関数を実行するタイミングを、スクリプトの読み込みが完了した後に変更しました。
+
+```html
+<script
+  id="test"
+  type="text/javascript"
+  async
+  src="../dist/embedded-chat.umd.cjs"
+></script>
+<script type="text/javascript">
+  const script = document.getElementById("test")
+  script.addEventListener("load", () => {
+    run({ id: "ここにBOT_IDを埋め込む" })
+  })
+
+  function waitForElement(selector) {
+    return new Promise(resolve => {
+      const element = document.querySelector(selector)
+      if (element) {
+        resolve(element)
+      } else {
+        const observer = new MutationObserver(() => {
+          const element = document.querySelector(selector)
+          if (element) {
+            resolve(element)
+            observer.disconnect()
+          }
+        })
+        observer.observe(document.body, { childList: true, subtree: true })
+      }
+    })
+  }
+
+  async function run({ id }) {
+    if (document.getElementById("test-bot")) {
+      return
+    }
+
+    await waitForElement('body')
+
+    const root = document.createElement("div")
+    root.id = "test-bot"
+
+    document.body.appendChild(root)
+    ReactDOM.createRoot(root as HTMLElement).render(
+      <div>
+        <EmbeddedChat id={id} />
+      </div>
+    )
+  }
+</script>
+```
+
+この修正により、`run`関数が実行される前に`body`要素が存在していることを保証します。そのため、要素の作成に関する問題が起こらなくなります。

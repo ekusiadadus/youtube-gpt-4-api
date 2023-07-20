@@ -1,0 +1,69 @@
+model: gpt-4
+time: 0:00:41.884921
+question: @app.websocket(
+    "/cs/chat",
+    name="CS chat",
+    # WebSocketの接続を認証する箇所をどうしようか検討する
+    # dependencies=[Depends(server.auth_service)],
+)
+async def cs_chat(
+    websocket: WebSocket,
+):
+    bot_id = "1"
+    await manager.connect(websocket, bot_id=bot_id)
+    try:
+        chat = ChatHistory.new(
+            bot_id=bot_id,
+            user_id="1",
+            name="",
+            description="",
+            messages=[],
+        )
+
+        while True:
+            data = await websocket.receive_text()
+
+            res = await server.cs_handler.cs_chat(
+                chat_id=chat.id,
+                user_id=None,
+                bot_id=bot_id,
+                question_text=data,
+                ws=manager,
+            )
+            print(res)
+            # await manager.send_message(f"ボットID: {bot_id} ユーザーID: {user_id} メッセージ: {res}", bot_id)
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket, bot_id)
+
+上のFastAPIのwebsocketコードで、websocketの接続を保持し続けているので、修正したいです。
+具体的には、定期的にpingを送信して、pongを受け取ることで、接続を保持するかを決定したいです。
+どのようにすべきですか？
+
+answer: FastAPIのWebSocketに対して定期的にpingを送付するためには、別のタスクを作成してその中でループ処理を行いpingを送る必要があります。以下にその実装例を記載します。 
+
+```python
+import asyncio
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    loop = asyncio.get_event_loop()
+    loop.create_task(send_ping(websocket)) # create new task
+    try:
+        while True:
+            data = await websocket.receive_text()  
+            ....
+    except WebSocketDisconnect:
+        print("Connection Closed")
+
+async def send_ping(ws: WebSocket):
+    while True:
+        await asyncio.sleep(60)  # wait for 1 min
+        await ws.send_text("ping")  # send ping
+```
+
+上記の例では、WebSocket 接続が確立された後、非同期でpingを送るタスク `send_ping(websocket)` を作成しています。ループ中で1分毎に "ping" を送ります。
+
+ご注意として、上記は送信側（サーバ側）の実装になります。受信側については、特定のメッセージを受け取った場合（"ping"を受け取った場合など）に適切なレスポンス（"pong"など）を返すように実装が必要です。そして、それが確認できなかった場合接続のクローズ処理を行うなど、具体的な流れはご自身のサービスの設計に基づきます。
+
+今回のケースでは、受信側（クライアント側）がブラウザであると仮定すると、JavaScript側でWebSocketのonmessageイベントなどを使って "ping" を受け取ったら "pong" を返すなどの処理を追加で実装することになります。

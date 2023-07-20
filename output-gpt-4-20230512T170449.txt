@@ -1,0 +1,163 @@
+model: gpt-4
+time: 0:01:45.388993
+question: 
+
+```python
+import time
+from botocore.exceptions import ClientError
+import json
+import os
+import logging
+
+
+try:
+    from repository import UserClient
+    from models import User
+except Exception:
+    import sys
+
+    sys.path.append("amplify/backend/function/kittbackenddevUtilLayer/lib/python")
+    from repository import UserClient
+    from models import User
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+env = os.environ["ENV"]
+
+
+def handler(event, context):
+    input_data = json.loads(event["body"])
+
+    user_id = input_data["user_id"]
+    company_id = input_data["company_id"]
+    family_name = input_data["family_name"]
+    given_name = input_data["given_name"]
+    email = input_data["email"]
+
+    user_table_client = UserClient(env=env)
+
+    user = user_table_client.get(user_id=user_id, company_id=company_id)
+
+    if user is None:
+        logger.error("user not found")
+        return {
+            "statusCode": 404,
+            "headers": {
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+            },
+            "body": json.dumps({"error": "user not found"}),
+        }
+
+    user = User(
+        user_id=user_id,
+        company_id=company_id,
+        family_name=family_name,
+        given_name=given_name,
+        email=email,
+        created_at=user.created_at,
+        updated_at=int(time.time()),
+    )
+
+    try:
+        user_table_client.update(user=user)
+    except ClientError as e:
+        logger.error(e.response["Error"]["Message"])
+        return {
+            "statusCode": 500,
+            "headers": {
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+            },
+            "body": json.dumps({"error": "Error in updating user to DynamoDB"}),
+        }
+```
+
+上のコードで改善できるところがあれば修正してください。
+また、Google Python Style Guideに準拠したPythonのコメント、コードであることを前提としてください。
+
+
+answer: このコードを改善するには、以下の点があります:
+
+1. エラーメッセージを定数にまとめる。
+2. レスポンスヘッダーを定数にまとめる。
+3. エラーメッセージを関数に分ける。
+
+以下は、上記の点を改善したコードです。
+
+```python
+import time
+import json
+import os
+import logging
+
+from botocore.exceptions import ClientError
+
+try:
+    from repository import UserClient
+    from models import User
+except Exception:
+    import sys
+
+    sys.path.append("amplify/backend/function/kittbackenddevUtilLayer/lib/python")
+    from repository import UserClient
+    from models import User
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+env = os.environ["ENV"]
+
+ERROR_USER_NOT_FOUND = "user not found"
+ERROR_UPDATE_USER = "Error in updating user to DynamoDB"
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+}
+
+def handle_error(status_code, error_message):
+    return {
+        "statusCode": status_code,
+        "headers": CORS_HEADERS,
+        "body": json.dumps({"error": error_message}),
+    }
+
+
+def handler(event, context):
+    input_data = json.loads(event["body"])
+
+    user_id = input_data["user_id"]
+    company_id = input_data["company_id"]
+    family_name = input_data["family_name"]
+    given_name = input_data["given_name"]
+    email = input_data["email"]
+
+    user_table_client = UserClient(env=env)
+
+    user = user_table_client.get(user_id=user_id, company_id=company_id)
+
+    if user is None:
+        logger.error(ERROR_USER_NOT_FOUND)
+        return handle_error(404, ERROR_USER_NOT_FOUND)
+
+    user = User(
+        user_id=user_id,
+        company_id=company_id,
+        family_name=family_name,
+        given_name=given_name,
+        email=email,
+        created_at=user.created_at,
+        updated_at=int(time.time()),
+    )
+
+    try:
+        user_table_client.update(user=user)
+    except ClientError as e:
+        logger.error(e.response["Error"]["Message"])
+        return handle_error(500, ERROR_UPDATE_USER)
+```

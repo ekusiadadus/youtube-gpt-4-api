@@ -1,0 +1,322 @@
+model: gpt-4
+time: 0:04:31.336402
+question: 
+
+import Accordion from "@mui/material/Accordion"
+import AccordionSummary from "@mui/material/AccordionSummary"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { APIDocs } from "../../APIDocs"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+import {
+  Container,
+  Box,
+  Grid,
+  Typography,
+  Button,
+  Modal,
+  IconButton,
+  Snackbar // 追加
+} from "@mui/material"
+import { useState } from "react"
+import CopyIcon from "@mui/icons-material/FileCopy"
+import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs"
+import { Light as SyntaxHighlighter } from "react-syntax-highlighter"
+import { EmbeddedChat } from "../../../components/EmbeddedChat/EmbeddedChat"
+import { Padding } from "@mui/icons-material"
+
+docco.hljs.background = "transparent"
+docco.hljs.padding = "0"
+
+export const APIKey = () => {
+  console.log("APIKey")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+  const [modalOpen, setModalOpen] = useState(false)
+  const [copied, setCopied] = useState(false) // 追加
+  const handleModalOpen = () => {
+    setModalOpen(true)
+  }
+  const handleModalClose = () => {
+    setModalOpen(false)
+  }
+
+  const handleCopyCode = async () => {
+    await navigator.clipboard.writeText(embedCode)
+    setCopied(true) // 追加
+  }
+
+  const handleCloseSnackbar = () => {
+    // 追加
+    setCopied(false)
+  }
+
+  const embedCode = `<script
+    id="spiralBot"
+    type="text/javascript"
+    async
+    src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+></script>
+<script type="text/javascript">
+  const script = document.getElementById("spiralBot");
+  script.addEventListener("load", () => {
+    globalThis.run({ botID: "${botID}", companyID: "${companyID}" });
+  });
+</script>`
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Grid container spacing={2} justifyContent="flex-end">
+            <Grid item xs={12} md={6}>
+              <Typography variant="h5">外部連携</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleModalOpen}
+                fullWidth
+              >
+                <Typography variant="h6">組み込みスクリプト</Typography>
+              </Button>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <APIDocs />
+          </AccordionDetails>
+        </Accordion>
+
+        <Modal
+          open={modalOpen}
+          onClose={handleModalClose}
+          aria-labelledby="embed-code-modal"
+          aria-describedby="embed-code-modal-description"
+        >
+          <Box
+            sx={{
+              width: "90%",
+              maxWidth: "800px",
+              backgroundColor: "white",
+              borderRadius: 2,
+              boxShadow: 24,
+              p: 2,
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)"
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <Typography id="embed-code-modal" variant="h6" component="h2">
+                組み込みスクリプト
+              </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center"
+                }}
+              >
+                <IconButton
+                  sx={{ size: "2rem", p: "1rem" }}
+                  onClick={handleCopyCode}
+                  title="コードをコピー"
+                >
+                  <CopyIcon />
+                </IconButton>
+                <Button color="secondary" onClick={handleModalClose}>
+                  Close
+                </Button>
+              </Box>
+            </Box>
+
+            <Box
+              sx={{
+                backgroundColor: "#f9f9f9", // 背景色を変更
+                p: 2, // パディングを追加
+                borderRadius: 2, // 角丸を追加
+                overflow: "auto", // スクロールを追加
+                marginTop: 0
+              }}
+            >
+              <SyntaxHighlighter language="javascript" style={docco}>
+                {embedCode}
+              </SyntaxHighlighter>
+            </Box>
+          </Box>
+        </Modal>
+
+        <Snackbar // 追加
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          open={copied}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+          message="コードをコピーしました"
+        />
+      </Box>
+      <EmbeddedChat companyID={companyID} botID={botID} />
+    </>
+  )
+}
+```
+
+
+組み込みチャットが現状、フロントではButton+モーダルで実装されていますが、APIDocsと同じ仕様に変更したいです。
+コードを修正してください。
+
+
+answer: 以下のコードは、組み込みチャットをAccordionコンポーネントに移動し、Buttonとモーダルを削除したバージョンです。
+
+```javascript
+import Accordion from "@mui/material/Accordion"
+import AccordionSummary from "@mui/material/AccordionSummary"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { APIDocs } from "../../APIDocs"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+import {
+  Container,
+  Box,
+  Grid,
+  Typography,
+  Button,
+  Modal,
+  IconButton,
+  Snackbar // 追加
+} from "@mui/material"
+import { useState } from "react"
+import CopyIcon from "@mui/icons-material/FileCopy"
+import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs"
+import { Light as SyntaxHighlighter } from "react-syntax-highlighter"
+import { EmbeddedChat } from "../../../components/EmbeddedChat/EmbeddedChat"
+import { Padding } from "@mui/icons-material"
+
+docco.hljs.background = "transparent"
+docco.hljs.padding = "0"
+
+export const APIKey = () => {
+  console.log("APIKey")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+  const [copied, setCopied] = useState(false) // 追加
+
+  const handleCopyCode = async () => {
+    await navigator.clipboard.writeText(embedCode)
+    setCopied(true) // 追加
+  }
+
+  const handleCloseSnackbar = () => {
+    // 追加
+    setCopied(false)
+  }
+
+  const embedCode = `<script
+    id="spiralBot"
+    type="text/javascript"
+    async
+    src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+></script>
+<script type="text/javascript">
+  const script = document.getElementById("spiralBot");
+  script.addEventListener("load", () => {
+    globalThis.run({ botID: "${botID}", companyID: "${companyID}" });
+  });
+</script>`
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Grid container spacing={2} justifyContent="flex-end">
+            <Grid item xs={12} md={6}>
+              <Typography variant="h5">外部連携</Typography>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <APIDocs />
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>組み込みスクリプト</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Box
+              sx={{
+                backgroundColor: "#f9f9f9", // 背景色を変更
+                p: 2, // パディングを追加
+                borderRadius: 2, // 角丸を追加
+                overflow: "auto", // スクロールを追加
+                marginTop: 0
+              }}
+            >
+              <SyntaxHighlighter language="javascript" style={docco}>
+                {embedCode}
+              </SyntaxHighlighter>
+              <IconButton
+                sx={{ size: "2rem", p: "1rem" }}
+                onClick={handleCopyCode}
+                title="コードをコピー"
+              >
+                <CopyIcon />
+              </IconButton>
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+
+        <Snackbar // 追加
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          open={copied}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+          message="コードをコピーしました"
+        />
+      </Box>
+      <EmbeddedChat companyID={companyID} botID={botID} />
+    </>
+  )
+}
+```
+
+これにより、組み込みチャットの表示がAccordionで制御されるようになります。

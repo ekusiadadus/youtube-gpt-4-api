@@ -1,0 +1,287 @@
+model: gpt-4
+time: 0:04:41.931791
+question: 
+import Accordion from "@mui/material/Accordion"
+import AccordionSummary from "@mui/material/AccordionSummary"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { APIDocs } from "../../APIDocs"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+import {
+  Container,
+  Box,
+  Grid,
+  Typography,
+  Alert,
+  IconButton,
+  Snackbar // 追加
+} from "@mui/material"
+import { useState } from "react"
+import CopyIcon from "@mui/icons-material/FileCopy"
+import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs"
+import { Light as SyntaxHighlighter } from "react-syntax-highlighter"
+import { EmbeddedChat } from "../../../components/EmbeddedChat/EmbeddedChat"
+import { Padding } from "@mui/icons-material"
+
+docco.hljs.background = "transparent"
+docco.hljs.padding = "0"
+
+export const APIKey = () => {
+  console.log("APIKey")
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  // TODO: 動的に取得
+  const companyID: string = auth.userID
+  const [copied, setCopied] = useState(false) // 追加
+
+  const handleCopyCode = async () => {
+    await navigator.clipboard.writeText(embedCode)
+    setCopied(true) // 追加
+  }
+
+  const handleCloseSnackbar = () => {
+    // 追加
+    setCopied(false)
+  }
+
+  const embedCode = `<script
+    id="spiralBot"
+    type="text/javascript"
+    async
+    src="https://spiral-ai-dev-embedded-chat-bucket.s3.ap-northeast-1.amazonaws.com/embedded-chat.umd.cjs"
+></script>
+<script type="text/javascript">
+  const script = document.getElementById("spiralBot");
+  script.addEventListener("load", () => {
+    globalThis.run({ botID: "${botID}", companyID: "${companyID}" });
+  });
+</script>`
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Grid container spacing={2} justifyContent="flex-end">
+            <Grid item xs={12} md={6}>
+              <Typography variant="h5">外部連携</Typography>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <APIDocs />
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion sx={{ width: "800px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>組み込みスクリプト</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container alignItems="center">
+              <Grid item md={10}>
+                <Typography variant="subtitle1">
+                  以下のコードをコピーして、対象のウェブサイトに追加してください。
+                </Typography>
+              </Grid>
+              <Grid item md={2} />
+              <Grid item md>
+                <IconButton
+                  sx={{ width: "2rem", height: "2rem" }}
+                  onClick={handleCopyCode}
+                  title="コードをコピー"
+                >
+                  <CopyIcon />
+                </IconButton>
+              </Grid>
+            </Grid>
+            <Box
+              sx={{
+                backgroundColor: "#f9f9f9", // 背景色を変更
+                p: 2, // パディングを追加
+                borderRadius: 2, // 角丸を追加
+                overflow: "auto", // スクロールを追加
+                width: "100%" // 幅を100%に設定
+              }}
+            >
+              <SyntaxHighlighter language="javascript" style={docco}>
+                {embedCode}
+              </SyntaxHighlighter>
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+
+        <Snackbar // 追加
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          open={copied}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+          message="コードをコピーしました"
+        />
+      </Box>
+      <EmbeddedChat companyID={companyID} botID={botID} />
+    </>
+  )
+}
+
+```
+
+
+1. コピーアイコンをアコーディオンの右上に表示し固定したい
+2. レスポンシブ対応したい
+
+の2点を修正してください。
+
+
+answer: まず、コピーアイコンをアコーディオンの右上に表示し固定するために、アコーディオンに`position: 'relative'`を設定し、`IconButton`に対して`position: 'absolute'`および`top`と`right`の位置を指定します。
+
+次に、レスポンシブ対応を行うために、アコーディオンの幅を固定ではなく、`100%`に指定します。また、内部の各要素もレスポンシブ対応を行う必要があります。
+
+以下のコードは、上記の修正を行ったものです。
+
+```jsx
+import { useState } from "react"
+import { useParams } from "react-router-dom"
+import { useAuth } from "../../../auth"
+import {
+  Container,
+  Grid,
+  Typography,
+  Alert,
+  IconButton,
+  Snackbar,
+  Box,
+} from "@mui/material"
+import {
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  ExpandMoreIcon,
+  APIDocs,
+  docco,
+  SyntaxHighlighter,
+  Light as Light,
+  EmbeddedChat,
+} from "…"
+
+export const APIKey = () => {
+  const params = useParams()
+  const auth = useAuth()
+  const botID = params.botID as string
+  const companyID: string = auth.userID
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyCode = async () => {
+    await navigator.clipboard.writeText(embedCode)
+    setCopied(true)
+  }
+
+  const handleCloseSnackbar = () => {
+    setCopied(false)
+  }
+
+  const embedCode = `<script
+    id="spiralBot"
+     …
+  )
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          m: 4,
+        }}
+      >
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Typography>外部連携</Typography>
+        </Container>
+
+        <Accordion sx={{ width: "100%", position: "relative" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>API Docs</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <APIDocs />
+          </AccordionDetails>
+          <IconButton
+            sx={{
+              width: "2rem",
+              height: "2rem",
+              position: "absolute",
+              top: 8,
+              right: 16,
+            }}
+            onClick={handleCopyCode}
+            title="コードをコピー"
+          >
+            <CopyIcon />
+          </IconButton>
+        </Accordion>
+
+        <Accordion sx={{ width: "100%" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography>組み込みスクリプト</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container alignItems="center">
+              <Grid item md={10}>
+                <Typography variant="subtitle1">
+                  以下のコードをコピーして、対象のウェブサイトに追加してください。
+                </Typography>
+              </Grid>
+              <Grid item md={2} />
+              <Grid item md>
+                <IconButton
+                  sx={{ width: "2rem", height: "2rem" }}
+                  onClick={handleCopyCode}
+                  title="コードをコピー"
+                >
+                  <CopyIcon />
+                </IconButton>
+              </Grid>
+            </Grid>
+            <Box
+              sx={{
+                backgroundColor: "#f9f9f9",
+                p: 2,
+                borderRadius: 2,
+                overflow: "auto",
+                width: "100%",
+              }}
+            >
+              <SyntaxHighlighter language="javascript" style={docco}>
+                {embedCode}
+              </SyntaxHighlighter>
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+
+        <Snackbar
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          open={copied}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+          message="コードをコピーしました"
+        />
+      </Box>
+      <EmbeddedChat companyID={companyID} botID={botID} />
+    </>
+  )
+}
+```
+
+この修正により、コピーアイコンがアコーディオンの右上に表示され、レスポンシブ対応も行われるようになりました。
